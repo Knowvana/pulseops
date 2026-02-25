@@ -21,6 +21,7 @@ export { default as ConfirmationModal } from '@shared/components/ConfirmationMod
 export { default as LoadingSpinner } from '@shared/components/LoadingSpinner';
 export { default as SettingsModal } from '@shared/components/SettingsModal';
 export { default as LoginForm } from '@shared/components/LoginForm';
+export { default as StatusTile } from '@shared/components/StatusTile';
 
 // --- Layouts ---
 export { default as ModuleLayout } from '@shared/components/layouts/ModuleLayout';

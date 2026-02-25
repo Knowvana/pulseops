@@ -36,8 +36,18 @@ export async function testConnection() {
   try {
     await sequelize.authenticate();
     const latencyMs = Date.now() - start;
-    logger.info(logMessages.database.connected, { latencyMs });
-    return { success: true, latencyMs };
+    
+    // Get database version
+    let version = null;
+    try {
+      const [result] = await sequelize.query("SELECT version() as version");
+      version = result[0]?.version || null;
+    } catch (_) {
+      // If version query fails, continue without it
+    }
+    
+    logger.info(logMessages.database.connected, { latencyMs, version });
+    return { success: true, latencyMs, version };
   } catch (err) {
     logger.error(logMessages.database.connectionFailed, { error: err.message });
     return { success: false, error: err.message };

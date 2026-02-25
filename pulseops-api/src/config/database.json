@@ -1,8 +1,8 @@
 {
   "provider": "PostgreSQL",
-  "host": "postgres",
+  "host": "localhost",
   "port": 5432,
-  "database": "postgres",
+  "database": "postgres_db",
   "username": "postgres",
   "password": "Infosys@123",
   "schema": "public",
@@ -14,5 +14,6 @@
     "idle": 10000
   },
   "logging": false,
-  "ssl": false
+  "ssl": false,
+  "passwordHash": "$2a$10$WWWNEtgYHRIrs5p7KLQGS.qL3P90kjTSdmQrdFWjk6SXMFFdxwpby"
 }

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, LogOut, ChevronDown, UserPlus, LogIn, MonitorDot, Shield } from 'lucide-react';
+import { Settings, LogOut, ChevronDown, UserPlus, LogIn, MonitorDot } from 'lucide-react';
 import uiText from '@shared/config/uiElementsText.json';
 
 const txt = uiText.topNav;
@@ -38,54 +38,71 @@ export default function TopNav({
       <div className="h-0.5 w-full bg-gradient-to-r from-brand-400 via-teal-400 to-emerald-400" />
 
       <header className="bg-white/90 backdrop-blur-2xl border-b border-surface-200/80 sticky top-0 z-[60] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-        <div className="w-full px-4 h-14 flex items-center justify-between">
+        <div className="w-full flex items-center h-14">
 
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2.5">
+          {/* Left section matching sidebar width */}
+          <div className="flex items-center w-60 shrink-0 h-full px-5">
+            <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-teal-500 flex items-center justify-center shadow-sm shadow-brand-200">
                 <span className="text-white text-sm font-extrabold">{(appName || 'P').charAt(0)}</span>
               </div>
-              <span className="text-sm font-bold text-surface-800 hidden sm:block">{appName}</span>
+              <span className="text-lg font-bold text-surface-800 hidden sm:block tracking-tight">{appName}</span>
             </div>
+          </div>
 
-            {isAuthenticated && user.role === 'admin' && onSystemAdmin && (
-              <button
-                onClick={onSystemAdmin}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 border text-surface-600 border-transparent hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200"
-              >
-                <Shield size={14} className="text-amber-500" />
-                <span className="hidden sm:inline">{txt.buttons.systemAdmin}</span>
-              </button>
-            )}
-
-            {isAuthenticated && modules.length > 0 && (
-              <nav className="flex items-center gap-1">
-                {modules.map((mod) => {
-                  const Icon = mod.icon;
+          {/* Main navigation area */}
+          <div className="flex-1 flex items-center justify-between px-6 h-full">
+            {isAuthenticated && modules.length > 0 ? (
+              <nav className="flex items-center h-full">
+                {modules.map((mod, index) => {
                   const isActive = mod.id === activeModuleId;
+                  const isLast = index === modules.length - 1;
+                  // Map module IDs to lucide icons
+                  const getModuleIcon = (id) => {
+                    switch(id) {
+                      case 'platform_admin': return <Settings size={18} className={`mr-2.5 transition-colors ${isActive ? 'text-brand-600' : 'text-surface-400 group-hover:text-brand-500'}`} />;
+                      case 'shift_roster': return <UserPlus size={18} className={`mr-2.5 transition-colors ${isActive ? 'text-brand-600' : 'text-surface-400 group-hover:text-brand-500'}`} />;
+                      default: return <MonitorDot size={18} className={`mr-2.5 transition-colors ${isActive ? 'text-brand-600' : 'text-surface-400 group-hover:text-brand-500'}`} />;
+                    }
+                  };
+
                   return (
-                    <button
-                      key={mod.id}
-                      onClick={() => onSwitchModule(mod.id)}
-                      className={`
-                        flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-                        transition-all duration-200
-                        ${isActive
-                          ? 'bg-brand-50 text-brand-700 shadow-sm'
-                          : 'text-surface-500 hover:text-surface-700 hover:bg-surface-50'
-                        }
-                      `}
-                    >
-                      {Icon && <Icon size={15} />}
-                      <span className="hidden md:inline">{mod.name}</span>
-                    </button>
+                    <React.Fragment key={mod.id}>
+                      <button
+                        onClick={() => onSwitchModule(mod.id)}
+                        className={`
+                          relative h-full px-4 flex items-center text-[13px] font-bold uppercase tracking-wider transition-all duration-200 group
+                          ${isActive
+                            ? 'text-brand-700 bg-brand-50/30'
+                            : 'text-surface-500 hover:text-surface-900 hover:bg-surface-50/50'
+                          }
+                        `}
+                      >
+                        {getModuleIcon(mod.id)}
+                        {mod.name}
+                        
+                        {/* Bottom Gradient Border Highlighter */}
+                        {isActive && (
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-500 to-teal-400 rounded-t-md shadow-[0_-2px_8px_rgba(20,184,166,0.3)]" />
+                        )}
+                        {!isActive && (
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-surface-300 scale-x-0 group-hover:scale-x-100 transition-transform duration-200 origin-center rounded-t-md" />
+                        )}
+                      </button>
+
+                      {/* Vertical separator between menu items */}
+                      {!isLast && (
+                        <div className="h-6 w-px bg-gradient-to-b from-surface-200 via-surface-200 to-transparent mx-1" />
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </nav>
+            ) : (
+              <div /> // Spacer if no modules
             )}
-          </div>
 
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             {!isAuthenticated && (
               <>
                 {onRegister && (
@@ -150,7 +167,7 @@ export default function TopNav({
             )}
 
             {onToggleRightPanel && (
-              <div className="pl-1 ml-1 border-l border-surface-200">
+              <div className="pl-1 ml-1 border-l border-surface-200 h-8 flex items-center">
                 <button
                   onClick={onToggleRightPanel}
                   className={`
@@ -168,6 +185,7 @@ export default function TopNav({
                 </button>
               </div>
             )}
+            </div>
           </div>
         </div>
       </header>

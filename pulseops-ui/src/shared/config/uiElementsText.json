@@ -270,6 +270,12 @@
           "notConnected": "Not Connected",
           "testing": "Testing connection..."
         },
+        "saveStatusLabel": "Save Status",
+        "saveStatus": {
+          "success": "Configuration saved successfully.",
+          "error": "Failed to save configuration.",
+          "saving": "Saving database configuration..."
+        },
         "typeLabel": "PostgreSQL Database",
         "typeDescription": "Enterprise backend with Sequelize ORM, JWT auth, and rate limiting"
       },

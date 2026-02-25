@@ -36,7 +36,19 @@ const router = Router();
 router.get('/test-connection', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     const result = await testConnection();
-    res.json({ success: result.success, data: result });
+    const statusCode = result.success ? 200 : 503;
+    res.status(statusCode).json({
+      success: result.success,
+      data: {
+        connected: result.success,
+        latencyMs: result.latencyMs,
+        version: result.version || null,
+        error: result.error,
+        message: result.success 
+          ? `Database connection successful (${result.version ? result.version.split(',')[0] : 'Unknown version'})` 
+          : 'Database connection failed. Ensure PostgreSQL is running and accessible.',
+      },
+    });
   } catch (err) { next(err); }
 });
 
@@ -130,6 +142,20 @@ router.post('/create-schema', authenticate, authorize('admin'), async (req, res,
  */
 router.get('/stats', authenticate, authorize('admin'), async (req, res, next) => {
   try {
+    // Test connection first
+    const connectionTest = await testConnection();
+    if (!connectionTest.success) {
+      logger.warn('Database stats requested but connection failed', { error: connectionTest.error });
+      return res.status(503).json({
+        success: false,
+        error: {
+          message: 'Database connection failed. Ensure PostgreSQL is running and accessible.',
+          code: 'DB_CONNECTION_FAILED',
+          details: connectionTest.error,
+        },
+      });
+    }
+
     const [results] = await sequelize.query(
       "SELECT schemaname, relname AS table_name, n_live_tup AS row_count FROM pg_stat_user_tables WHERE schemaname = 'public'"
     );

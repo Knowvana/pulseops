@@ -31,7 +31,7 @@ const MODULE_MANIFESTS = [
   },
   {
     id: 'platform_admin',
-    name: 'Platform Admin',
+    name: 'Admin',
     shortName: 'Admin',
     description: 'System overview, user management, settings, and logs',
     icon: Shield,

@@ -25,6 +25,7 @@ import SettingsDatabase from '@modules/admin/views/SettingsDatabase';
 import SettingsDbObjects from '@modules/admin/views/SettingsDbObjects';
 import SettingsAuth from '@modules/admin/views/SettingsAuth';
 import SettingsLogging from '@modules/admin/views/SettingsLogging';
+import ShiftRosterApp from '@modules/roster/ShiftRosterApp';
 
 const navTxt = uiText.platformAdmin.navItems;
 const settingsTxt = uiText.platformAdmin.settings;
@@ -48,6 +49,13 @@ export default function PlatformDashboard({ user, onLogout }) {
   const [activeModuleId, setActiveModuleId] = useState('platform_admin');
   const [activeView, setActiveView] = useState('overview');
   const [settingsTab, setSettingsTab] = useState('settings_db');
+
+  const handleSwitchModule = useCallback((moduleId) => {
+    setActiveModuleId(moduleId);
+    if (moduleId === 'platform_admin') {
+      setActiveView('overview');
+    }
+  }, []);
 
   const handleNavSelect = useCallback((id) => {
     setActiveView(id);
@@ -105,7 +113,7 @@ export default function PlatformDashboard({ user, onLogout }) {
     );
   };
 
-  const renderView = () => {
+  const renderAdminView = () => {
     switch (activeView) {
       case 'overview': return <AdminOverview user={user} onNavigate={handleNavSelect} />;
       case 'users':    return <UsersPlaceholder />;
@@ -115,24 +123,32 @@ export default function PlatformDashboard({ user, onLogout }) {
     }
   };
 
-  return (
-    <AppShell
-      appName={appConfig.appName || 'PulseOps'}
-      modules={availableModules}
-      activeModuleId={activeModuleId}
-      onSwitchModule={setActiveModuleId}
-      onLogout={onLogout}
-      onSystemAdmin={() => { setActiveView('overview'); }}
-      user={user}
-      sideNavTitle={uiText.platformAdmin.sideNav.title}
-      sideNavItems={ADMIN_NAV_ITEMS}
-      activeSideNavItemId={activeView}
-      onSelectSideNavItem={handleSideNavSelect}
-      logger={Logger}
-    >
-      {renderView()}
-    </AppShell>
-  );
+  const renderModuleContent = () => {
+    return (
+      <AppShell
+        appName={appConfig.appName || 'PulseOps'}
+        modules={availableModules}
+        activeModuleId={activeModuleId}
+        onSwitchModule={handleSwitchModule}
+        onLogout={onLogout}
+        onSystemAdmin={() => { setActiveView('overview'); }}
+        user={user}
+        sideNavTitle={uiText.platformAdmin.sideNav.title}
+        sideNavItems={ADMIN_NAV_ITEMS}
+        activeSideNavItemId={activeView}
+        onSelectSideNavItem={handleSideNavSelect}
+        logger={Logger}
+      >
+        {activeModuleId === 'shift_roster' ? (
+          <ShiftRosterApp />
+        ) : (
+          renderAdminView()
+        )}
+      </AppShell>
+    );
+  };
+
+  return renderModuleContent();
 }
 
 function UsersPlaceholder() {

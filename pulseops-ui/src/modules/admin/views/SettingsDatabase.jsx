@@ -1,28 +1,30 @@
 import React, { useState, useCallback } from 'react';
-import { Database, RefreshCw, Save, CheckCircle2, XCircle } from 'lucide-react';
-import Card from '@shared/components/Card';
-import Button from '@shared/components/Button';
-import ProgressModal from '@shared/components/ProgressModal';
-import ActionModal from '@shared/components/ActionModal';
-import ApiClient from '@shared/services/apiClient';
-import Logger from '@shared/services/logger';
+import { Database, RefreshCw, Save, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
+import { Card, Button, ProgressModal, ActionModal, StatusTile, Logger, ApiClient } from '@shared';
 import uiText from '@shared/config/uiElementsText.json';
 import messages from '@shared/config/messages.json';
 
 const txt = uiText.platformAdmin.settings.database;
 
-function EditableField({ label, value, onChange, placeholder, disabled, type = 'text' }) {
+function EditableField({ label, value, onChange, placeholder, disabled, type = 'text', rightAddon }) {
   return (
     <div>
       <label className="block text-xs font-semibold text-surface-600 mb-1">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition-all disabled:bg-surface-50 disabled:text-surface-400"
-      />
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={`w-full px-3 py-2 text-sm border border-surface-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition-all disabled:bg-surface-50 disabled:text-surface-400 ${rightAddon ? 'pr-9' : ''}`}
+        />
+        {rightAddon && (
+          <div className="absolute inset-y-0 right-2 flex items-center">
+            {rightAddon}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -37,7 +39,9 @@ export default function SettingsDatabase() {
     ssl: false,
   });
 
-  const [connectionStatus, setConnectionStatus] = useState({ status: 'unknown', latencyMs: 0 });
+  const [connectionStatus, setConnectionStatus] = useState({ status: 'unknown', latencyMs: 0, version: null });
+  const [connectionMessage, setConnectionMessage] = useState('');
+  const [saveStatus, setSaveStatus] = useState({ status: 'idle', message: '' });
   const [isTesting, setIsTesting] = useState(false);
   const [testProgress, setTestProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -45,26 +49,35 @@ export default function SettingsDatabase() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleTestConnect = useCallback(async () => {
     setIsTesting(true);
     setTestProgress(10);
+    setConnectionMessage('');
     try {
       setTestProgress(40);
       const result = await ApiClient.get('/database/test-connection');
       setTestProgress(90);
 
       if (result?.success) {
-        setConnectionStatus({ status: 'connected', latencyMs: result.data?.latencyMs || 0 });
-        Logger.info('Settings - Database', 'Connection test successful', { latencyMs: result.data?.latencyMs });
+        setConnectionStatus({ 
+          status: 'connected', 
+          latencyMs: result.data?.latencyMs || 0,
+          version: result.data?.version || null
+        });
+        setConnectionMessage(result.data?.message || messages.success.dbConnected);
+        Logger.info('Settings - Database', result.data?.message || messages.success.dbConnected, { latencyMs: result.data?.latencyMs, version: result.data?.version });
       } else {
-        setConnectionStatus({ status: 'error', latencyMs: 0 });
-        Logger.warn('Settings - Database', 'Connection test failed', { error: result?.error?.message });
+        setConnectionStatus({ status: 'error', latencyMs: 0, version: null });
+        setConnectionMessage(result?.data?.message || result?.error?.message || messages.errors.dbConnectionFailed);
+        Logger.warn('Settings - Database', messages.errors.dbConnectionFailed, { error: result?.error?.message });
       }
       setTestProgress(100);
     } catch (err) {
-      setConnectionStatus({ status: 'error', latencyMs: 0 });
-      Logger.error('Settings - Database', 'Connection test error', { error: err.message });
+      setConnectionStatus({ status: 'error', latencyMs: 0, version: null });
+      setConnectionMessage(err.message || messages.errors.dbConnectionFailed);
+      Logger.error('Settings - Database', messages.errors.dbConnectionFailed, { error: err.message });
     } finally {
       setTimeout(() => { setIsTesting(false); setTestProgress(0); }, 300);
     }
@@ -74,6 +87,7 @@ export default function SettingsDatabase() {
     setIsSaving(true);
     setSaveProgress(10);
     setShowError(false);
+    setSaveStatus({ status: 'idle', message: '' });
     try {
       setSaveProgress(40);
       const payload = {
@@ -96,6 +110,7 @@ export default function SettingsDatabase() {
         setShowSuccess(true);
         setDbConfig(prev => ({ ...prev, password: '' }));
         Logger.info('Settings - Database', messages.success.configSaved, payload);
+        setSaveStatus({ status: 'success', message: result.data?.message || messages.success.configSaved });
       } else {
         throw new Error(result?.error?.message || messages.errors.configSaveFailed);
       }
@@ -104,6 +119,7 @@ export default function SettingsDatabase() {
       setErrorMessage(err.message || messages.errors.configSaveFailed);
       setShowError(true);
       Logger.error('Settings - Database', messages.errors.configSaveFailed, { error: err.message });
+      setSaveStatus({ status: 'error', message: err.message || messages.errors.configSaveFailed });
     }
   }, [dbConfig]);
 
@@ -134,7 +150,23 @@ export default function SettingsDatabase() {
           </div>
           <EditableField label={txt.fields.database} value={dbConfig.database} onChange={(v) => setDbConfig(p => ({ ...p, database: v }))} placeholder={txt.placeholders.database} />
           <EditableField label={txt.fields.username} value={dbConfig.username} onChange={(v) => setDbConfig(p => ({ ...p, username: v }))} placeholder={txt.placeholders.username} />
-          <EditableField label={txt.fields.password} value={dbConfig.password} onChange={(v) => setDbConfig(p => ({ ...p, password: v }))} placeholder={txt.placeholders.password} type="password" />
+          <EditableField
+            label={txt.fields.password}
+            value={dbConfig.password}
+            onChange={(v) => setDbConfig(p => ({ ...p, password: v }))}
+            placeholder={txt.placeholders.password}
+            type={showPassword ? 'text' : 'password'}
+            rightAddon={
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                className="text-surface-400 hover:text-surface-600 transition-colors"
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            }
+          />
 
           <div className="flex items-center gap-2 py-2">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -148,19 +180,43 @@ export default function SettingsDatabase() {
 
         <div className="h-px bg-gradient-to-r from-transparent via-surface-200 to-transparent my-4" />
 
-        {/* Connection Status */}
-        <div className="flex items-center justify-between py-2 mb-4">
-          <span className="text-xs font-semibold text-surface-600">{txt.connectionStatus}</span>
-          <span className={`inline-flex items-center gap-1.5 text-xs font-bold ${
-            connectionStatus.status === 'connected' ? 'text-emerald-600' :
-            connectionStatus.status === 'error' ? 'text-rose-600' : 'text-surface-400'
-          }`}>
-            {connectionStatus.status === 'connected' ? <CheckCircle2 size={13} /> : connectionStatus.status === 'error' ? <XCircle size={13} /> : null}
-            {connectionStatus.status === 'connected' ? `${txt.status.connected} (${connectionStatus.latencyMs}ms)` :
-             connectionStatus.status === 'error' ? txt.status.notConnected :
-             'Unknown'}
-          </span>
-        </div>
+        {/* Connection & Save Status */}
+        <StatusTile
+          label={txt.connectionStatus}
+          status={
+            connectionStatus.status === 'connected'
+              ? 'success'
+              : connectionStatus.status === 'error'
+                ? 'error'
+                : 'neutral'
+          }
+          statusText={
+            connectionStatus.status === 'connected'
+              ? `${txt.status.connected} (${connectionStatus.latencyMs}ms)`
+              : connectionStatus.status === 'error'
+                ? txt.status.notConnected
+                : undefined
+          }
+          message={connectionMessage}
+          meta={
+            connectionStatus.status === 'connected' && connectionStatus.version
+              ? `Version: ${connectionStatus.version.split(',')[0]}`
+              : undefined
+          }
+        />
+
+        <StatusTile
+          label={txt.saveStatusLabel}
+          status={saveStatus.status === 'success' ? 'success' : saveStatus.status === 'error' ? 'error' : 'neutral'}
+          statusText={
+            saveStatus.status === 'success'
+              ? txt.saveStatus.success
+              : saveStatus.status === 'error'
+                ? txt.saveStatus.error
+                : undefined
+          }
+          message={saveStatus.message}
+        />
 
         {/* Buttons */}
         <div className="flex items-center gap-2">
@@ -174,7 +230,7 @@ export default function SettingsDatabase() {
       </Card>
 
       <ProgressModal isOpen={isTesting} title={txt.buttons.testing} message={txt.status.testing} progress={testProgress} />
-      <ProgressModal isOpen={isSaving} title={txt.buttons.saving} message="Saving database configuration..." progress={saveProgress} />
+      <ProgressModal isOpen={isSaving} title={txt.buttons.saving} message={txt.saveStatus.saving} progress={saveProgress} />
 
       <ActionModal isOpen={showSuccess} title={messages.success.configSaved} icon={CheckCircle2} size="sm" variant="info" onClose={() => setShowSuccess(false)}>
         <p className="text-sm text-surface-600">{messages.success.configSaved}</p>
