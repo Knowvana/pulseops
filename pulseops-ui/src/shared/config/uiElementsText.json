@@ -193,8 +193,9 @@
       "columns": {
         "level": "Level",
         "time": "Time",
-        "component": "Component",
+        "source": "Source",
         "event": "Event",
+        "component": "Component",
         "user": "User",
         "message": "Message",
         "result": "Result",
@@ -213,6 +214,7 @@
           "level": "Level",
           "timestamp": "Timestamp",
           "source": "Source",
+          "event": "Event",
           "component": "Component",
           "user": "User",
           "message": "Message",
@@ -257,7 +259,7 @@
           "port": "5432",
           "database": "pulseops",
           "username": "postgres",
-          "password": "Enter password"
+          "password": "••••••••"
         },
         "buttons": {
           "testConnect": "Test Connect",

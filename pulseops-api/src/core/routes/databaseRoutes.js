@@ -42,10 +42,11 @@ router.get('/test-connection', authenticate, authorize('admin'), async (req, res
       data: {
         connected: result.success,
         latencyMs: result.latencyMs,
-        version: result.version || null,
+        dbVersion: result.dbVersion || null,
+        dbSystemTime: result.dbSystemTime || null,
         error: result.error,
         message: result.success 
-          ? `Database connection successful (${result.version ? result.version.split(',')[0] : 'Unknown version'})` 
+          ? 'Database connection successful' 
           : 'Database connection failed. Ensure PostgreSQL is running and accessible.',
       },
     });

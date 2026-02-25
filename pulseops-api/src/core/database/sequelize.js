@@ -37,17 +37,21 @@ export async function testConnection() {
     await sequelize.authenticate();
     const latencyMs = Date.now() - start;
     
-    // Get database version
-    let version = null;
+    // Get database version and system time
+    let dbVersion = null;
+    let dbSystemTime = null;
     try {
-      const [result] = await sequelize.query("SELECT version() as version");
-      version = result[0]?.version || null;
+      const [versionResult] = await sequelize.query("SELECT version() as version");
+      dbVersion = versionResult[0]?.version || null;
+      
+      const [timeResult] = await sequelize.query("SELECT NOW() as current_time");
+      dbSystemTime = timeResult[0]?.current_time || null;
     } catch (_) {
-      // If version query fails, continue without it
+      // If queries fail, continue without them
     }
     
-    logger.info(logMessages.database.connected, { latencyMs, version });
-    return { success: true, latencyMs, version };
+    logger.info(logMessages.database.connected, { latencyMs, dbVersion, dbSystemTime });
+    return { success: true, latencyMs, dbVersion, dbSystemTime };
   } catch (err) {
     logger.error(logMessages.database.connectionFailed, { error: err.message });
     return { success: false, error: err.message };

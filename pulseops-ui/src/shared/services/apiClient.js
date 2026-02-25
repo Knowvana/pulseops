@@ -79,6 +79,7 @@ class ApiClientService {
         success: response.ok,
         requestPayload: body,
         responsePayload: responseData,
+        user: this._user?.email || 'system',
       });
 
       if (response.status === 401) {

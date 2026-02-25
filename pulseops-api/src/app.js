@@ -23,6 +23,7 @@ import authRoutes from './core/routes/authRoutes.js';
 import databaseRoutes from './core/routes/databaseRoutes.js';
 import userRoutes from './core/routes/userRoutes.js';
 import configRoutes from './core/routes/configRoutes.js';
+import logsRoutes from './core/routes/logsRoutes.js';
 import rosterRoutes from './modules/roster/routes/rosterRoutes.js';
 
 const require = createRequire(import.meta.url);
@@ -62,6 +63,7 @@ export default function createApp() {
   app.use(`${prefix}/database`, databaseRoutes);
   app.use(`${prefix}/users`, userRoutes);
   app.use(`${prefix}/config`, configRoutes);
+  app.use(`${prefix}/logs`, logsRoutes);
   app.use(`${prefix}/roster`, rosterRoutes);
 
   // --- Swagger UI ---

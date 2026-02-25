@@ -39,44 +39,70 @@ export default function SettingsDatabase() {
     ssl: false,
   });
 
-  const [connectionStatus, setConnectionStatus] = useState({ status: 'unknown', latencyMs: 0, version: null });
-  const [connectionMessage, setConnectionMessage] = useState('');
-  const [saveStatus, setSaveStatus] = useState({ status: 'idle', message: '' });
+  // Unified status state for both Test Connect and Save Config
+  const [unifiedStatus, setUnifiedStatus] = useState({
+    type: null, // 'connection' | 'save' | null
+    status: 'neutral', // 'success' | 'error' | 'neutral'
+    message: '',
+    meta: null,
+  });
   const [isTesting, setIsTesting] = useState(false);
   const [testProgress, setTestProgress] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showError, setShowError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const handleTestConnect = useCallback(async () => {
     setIsTesting(true);
     setTestProgress(10);
-    setConnectionMessage('');
+    setUnifiedStatus({ type: null, status: 'neutral', message: '', meta: null });
     try {
       setTestProgress(40);
       const result = await ApiClient.get('/database/test-connection');
       setTestProgress(90);
 
       if (result?.success) {
-        setConnectionStatus({ 
-          status: 'connected', 
-          latencyMs: result.data?.latencyMs || 0,
-          version: result.data?.version || null
+        const latency = result.data?.latencyMs || 0;
+        const dbVersion = result.data?.dbVersion || null;
+        const dbSystemTime = result.data?.dbSystemTime || null;
+        
+        // Format database version (extract short version)
+        const versionShort = dbVersion ? dbVersion.split(',')[0].replace('PostgreSQL ', '') : 'Unknown';
+        
+        // Format system time (extract date and time)
+        const systemTime = dbSystemTime ? new Date(dbSystemTime).toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }) : 'Unknown';
+        
+        setUnifiedStatus({
+          type: 'connection',
+          status: 'success',
+          message: result.data?.message || messages.success.dbConnected,
+          meta: `Response Time: ${latency}ms • Database Version: ${versionShort} • Database System Time: ${systemTime}`,
         });
-        setConnectionMessage(result.data?.message || messages.success.dbConnected);
-        Logger.info('Settings - Database', result.data?.message || messages.success.dbConnected, { latencyMs: result.data?.latencyMs, version: result.data?.version });
+        Logger.info('Settings - Database', result.data?.message || messages.success.dbConnected, { latencyMs: latency, dbVersion, dbSystemTime });
       } else {
-        setConnectionStatus({ status: 'error', latencyMs: 0, version: null });
-        setConnectionMessage(result?.data?.message || result?.error?.message || messages.errors.dbConnectionFailed);
+        setUnifiedStatus({
+          type: 'connection',
+          status: 'error',
+          message: result?.data?.message || result?.error?.message || messages.errors.dbConnectionFailed,
+          meta: null,
+        });
         Logger.warn('Settings - Database', messages.errors.dbConnectionFailed, { error: result?.error?.message });
       }
       setTestProgress(100);
     } catch (err) {
-      setConnectionStatus({ status: 'error', latencyMs: 0, version: null });
-      setConnectionMessage(err.message || messages.errors.dbConnectionFailed);
+      setUnifiedStatus({
+        type: 'connection',
+        status: 'error',
+        message: err.message || messages.errors.dbConnectionFailed,
+        meta: null,
+      });
       Logger.error('Settings - Database', messages.errors.dbConnectionFailed, { error: err.message });
     } finally {
       setTimeout(() => { setIsTesting(false); setTestProgress(0); }, 300);
@@ -86,8 +112,7 @@ export default function SettingsDatabase() {
   const handleSaveConfig = useCallback(async () => {
     setIsSaving(true);
     setSaveProgress(10);
-    setShowError(false);
-    setSaveStatus({ status: 'idle', message: '' });
+    setUnifiedStatus({ type: null, status: 'neutral', message: '', meta: null });
     try {
       setSaveProgress(40);
       const payload = {
@@ -107,19 +132,26 @@ export default function SettingsDatabase() {
       if (result?.success) {
         setSaveProgress(100);
         setIsSaving(false);
-        setShowSuccess(true);
         setDbConfig(prev => ({ ...prev, password: '' }));
+        setUnifiedStatus({
+          type: 'save',
+          status: 'success',
+          message: result.data?.message || messages.success.configSaved,
+          meta: null,
+        });
         Logger.info('Settings - Database', messages.success.configSaved, payload);
-        setSaveStatus({ status: 'success', message: result.data?.message || messages.success.configSaved });
       } else {
         throw new Error(result?.error?.message || messages.errors.configSaveFailed);
       }
     } catch (err) {
       setIsSaving(false);
-      setErrorMessage(err.message || messages.errors.configSaveFailed);
-      setShowError(true);
+      setUnifiedStatus({
+        type: 'save',
+        status: 'error',
+        message: err.message || messages.errors.configSaveFailed,
+        meta: null,
+      });
       Logger.error('Settings - Database', messages.errors.configSaveFailed, { error: err.message });
-      setSaveStatus({ status: 'error', message: err.message || messages.errors.configSaveFailed });
     }
   }, [dbConfig]);
 
@@ -180,43 +212,24 @@ export default function SettingsDatabase() {
 
         <div className="h-px bg-gradient-to-r from-transparent via-surface-200 to-transparent my-4" />
 
-        {/* Connection & Save Status */}
-        <StatusTile
-          label={txt.connectionStatus}
-          status={
-            connectionStatus.status === 'connected'
-              ? 'success'
-              : connectionStatus.status === 'error'
-                ? 'error'
-                : 'neutral'
-          }
-          statusText={
-            connectionStatus.status === 'connected'
-              ? `${txt.status.connected} (${connectionStatus.latencyMs}ms)`
-              : connectionStatus.status === 'error'
-                ? txt.status.notConnected
-                : undefined
-          }
-          message={connectionMessage}
-          meta={
-            connectionStatus.status === 'connected' && connectionStatus.version
-              ? `Version: ${connectionStatus.version.split(',')[0]}`
-              : undefined
-          }
-        />
-
-        <StatusTile
-          label={txt.saveStatusLabel}
-          status={saveStatus.status === 'success' ? 'success' : saveStatus.status === 'error' ? 'error' : 'neutral'}
-          statusText={
-            saveStatus.status === 'success'
-              ? txt.saveStatus.success
-              : saveStatus.status === 'error'
-                ? txt.saveStatus.error
-                : undefined
-          }
-          message={saveStatus.message}
-        />
+        {/* Unified Status Display */}
+        {unifiedStatus.type && (
+          <div className="mb-4">
+            <StatusTile
+              label={unifiedStatus.type === 'connection' ? 'Connection Status' : 'Save Status'}
+              status={unifiedStatus.status}
+              statusText={
+                unifiedStatus.status === 'success'
+                  ? (unifiedStatus.type === 'connection' ? 'Connected' : 'Configuration Saved')
+                  : unifiedStatus.status === 'error'
+                    ? (unifiedStatus.type === 'connection' ? 'Connection Failed' : 'Save Failed')
+                    : undefined
+              }
+              message={unifiedStatus.message}
+              meta={unifiedStatus.meta}
+            />
+          </div>
+        )}
 
         {/* Buttons */}
         <div className="flex items-center gap-2">
@@ -229,16 +242,8 @@ export default function SettingsDatabase() {
         </div>
       </Card>
 
-      <ProgressModal isOpen={isTesting} title={txt.buttons.testing} message={txt.status.testing} progress={testProgress} />
-      <ProgressModal isOpen={isSaving} title={txt.buttons.saving} message={txt.saveStatus.saving} progress={saveProgress} />
-
-      <ActionModal isOpen={showSuccess} title={messages.success.configSaved} icon={CheckCircle2} size="sm" variant="info" onClose={() => setShowSuccess(false)}>
-        <p className="text-sm text-surface-600">{messages.success.configSaved}</p>
-      </ActionModal>
-
-      <ActionModal isOpen={showError} title="Configuration Failed" icon={XCircle} size="sm" variant="info" onClose={() => setShowError(false)}>
-        <p className="text-sm text-rose-600">{errorMessage}</p>
-      </ActionModal>
+      <ProgressModal isOpen={isTesting} title="Testing Connection" message="Connecting to database..." progress={testProgress} />
+      <ProgressModal isOpen={isSaving} title="Saving Configuration" message="Saving database configuration..." progress={saveProgress} />
     </div>
   );
 }

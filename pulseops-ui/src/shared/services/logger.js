@@ -60,17 +60,19 @@ class LoggerService {
     return LOG_LEVELS[level] >= LOG_LEVELS[this._config.minLevel || 'info'];
   }
 
-  _addSystemEntry(level, source, message, data = null) {
+  _addSystemEntry(level, source, message, data = null, options = {}) {
     if (!this._shouldLog(level)) return;
 
     const entry = {
       id: nextId(),
       timestamp: new Date().toISOString(),
       level,
-      source,
+      source: options.source || 'UI',
+      event: options.event || source,
       message,
       data,
       user: this._user?.email || this._user?.name || 'system',
+      userId: this._user?.id || null,
       result: level === 'error' ? 'failure' : level === 'warn' ? 'warning' : 'success',
     };
 

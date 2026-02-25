@@ -65,5 +65,38 @@
     "enableConsole": true,
     "enableRemote": true,
     "remoteFlushIntervalMs": 30000
+  },
+  "fields": {
+    "source": {
+      "label": "Source",
+      "description": "Where the log originated from",
+      "values": ["UI", "API", "Database", "System"]
+    },
+    "event": {
+      "label": "Event",
+      "description": "Type of event that occurred",
+      "examples": ["UI Click", "API Call", "Database Query", "Authentication", "Configuration Change"]
+    },
+    "apiUrl": {
+      "label": "API URL",
+      "description": "The API endpoint that was called"
+    },
+    "httpMethod": {
+      "label": "HTTP Method",
+      "description": "HTTP method used for the request",
+      "values": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+    },
+    "responseCode": {
+      "label": "Response Code",
+      "description": "HTTP status code returned by the server"
+    },
+    "requestBody": {
+      "label": "Request Body",
+      "description": "JSON payload sent in the request"
+    },
+    "responseBody": {
+      "label": "Response Body",
+      "description": "JSON response received from the server"
+    }
   }
 }

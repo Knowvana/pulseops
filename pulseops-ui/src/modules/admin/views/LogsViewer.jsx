@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ScrollText, Search, Filter, Trash2, RefreshCw, X, Globe,
-  CheckCircle2, XCircle, ArrowUp, ArrowDown, GripVertical, Clock
+  CheckCircle2, XCircle, ArrowUp, ArrowDown, GripVertical, Clock, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import Card from '@shared/components/Card';
 import Button from '@shared/components/Button';
 import PageHeader from '@shared/components/PageHeader';
 import Logger from '@shared/services/logger';
+import { sanitizeData, formatSanitizedJson } from '@shared/utils/logSanitizer';
 import uiText from '@shared/config/uiElementsText.json';
 
 const txt = uiText.platformAdmin.logs;
@@ -28,10 +29,12 @@ const RESULT_CONFIG = {
 const SYSTEM_COLUMNS = [
   { id: 'level',     label: txt.columns.level,     width: 70 },
   { id: 'time',      label: txt.columns.time,      width: 95 },
-  { id: 'component', label: txt.columns.component, width: 180 },
-  { id: 'user',      label: txt.columns.user,      width: 120 },
+  { id: 'source',    label: txt.columns.source,    width: 100 },
+  { id: 'event',     label: txt.columns.event,     width: 150 },
+  { id: 'component', label: txt.columns.component, width: 120 },
+  { id: 'user',      label: txt.columns.user,      width: 100 },
   { id: 'message',   label: txt.columns.message,   width: 0 },
-  { id: 'result',    label: txt.columns.result,     width: 75 },
+  { id: 'result',    label: txt.columns.result,    width: 75 },
 ];
 
 const API_COLUMNS = [
@@ -39,8 +42,6 @@ const API_COLUMNS = [
   { id: 'url',       label: txt.columns.apiUrl,       width: 0 },
   { id: 'status',    label: txt.columns.status,       width: 70 },
   { id: 'respTime',  label: txt.columns.responseTime, width: 95 },
-  { id: 'reqBody',   label: txt.columns.requestBody,  width: 120 },
-  { id: 'respBody',  label: txt.columns.responseBody, width: 120 },
   { id: 'timestamp', label: txt.columns.timestamp,    width: 95 },
   { id: 'result',    label: txt.columns.result,       width: 65 },
 ];
@@ -50,6 +51,8 @@ function getSortValue(log, colId, tab) {
     switch (colId) {
       case 'level': return log.level || '';
       case 'time': return log.timestamp || '';
+      case 'source': return log.source || '';
+      case 'event': return log.event || '';
       case 'component': return log.source || '';
       case 'user': return log.user || '';
       case 'message': return log.message || '';
@@ -69,6 +72,8 @@ function getSortValue(log, colId, tab) {
   }
 }
 
+const PAGE_SIZE = 500;
+
 export default function LogsViewer() {
   const [activeTab, setActiveTab] = useState('system');
   const [logs, setLogs] = useState([]);
@@ -77,6 +82,8 @@ export default function LogsViewer() {
   const [levelFilter, setLevelFilter] = useState('all');
   const [selectedLog, setSelectedLog] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [visibleColumns, setVisibleColumns] = useState(null);
 
   const syncFromMemory = useCallback(() => {
     setLogs([...Logger.getSystemLogs()]);
@@ -114,6 +121,13 @@ export default function LogsViewer() {
     return filtered;
   }, [logs, apiLogs, activeTab, levelFilter, searchText, sortConfig]);
 
+  const totalPages = Math.ceil(filteredLogs.length / PAGE_SIZE);
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
+    return filteredLogs.slice(start, end);
+  }, [filteredLogs, currentPage]);
+
   const handleClear = useCallback(() => {
     if (activeTab === 'system') Logger.clearSystemLogs();
     else Logger.clearApiLogs();
@@ -136,7 +150,19 @@ export default function LogsViewer() {
         return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-bold ${lc.bg} ${lc.color}`}>{lc.label}</span>;
       }
       case 'time':
-        return <span className="font-mono text-surface-400 text-xs">{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '—'}</span>;
+        return <span className="font-mono text-surface-400 text-xs whitespace-nowrap">{log.timestamp ? new Date(log.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) + ' ' + new Date(log.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</span>;
+      case 'source': {
+        const sourceColors = {
+          'UI': 'bg-blue-50 text-blue-600',
+          'API': 'bg-purple-50 text-purple-600',
+          'Database': 'bg-teal-50 text-teal-600',
+          'System': 'bg-surface-100 text-surface-600',
+        };
+        const colorClass = sourceColors[log.source] || 'bg-surface-50 text-surface-500';
+        return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${colorClass}`}>{log.source || '—'}</span>;
+      }
+      case 'event':
+        return <span className="text-surface-600 text-xs font-medium">{log.event || '—'}</span>;
       case 'component':
         return <span className="inline-block px-1.5 py-0.5 rounded bg-brand-50 text-brand-600 font-semibold text-xs">{log.source || '—'}</span>;
       case 'user':
@@ -165,8 +191,13 @@ export default function LogsViewer() {
       case 'url':
         return <span className="font-mono text-surface-600 text-xs">{log.url}</span>;
       case 'status': {
-        const ok = log.success;
-        return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-bold ${ok ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{log.statusCode}</span>;
+        const code = log.statusCode;
+        let bgColor = 'bg-surface-50 text-surface-600';
+        if (code >= 500) bgColor = 'bg-rose-50 text-rose-600';
+        else if (code >= 400) bgColor = 'bg-amber-50 text-amber-600';
+        else if (code >= 300) bgColor = 'bg-blue-50 text-blue-600';
+        else if (code >= 200) bgColor = 'bg-emerald-50 text-emerald-600';
+        return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-bold ${bgColor}`}>{code}</span>;
       }
       case 'respTime':
         return <span className="font-mono text-surface-500 text-xs">{log.durationMs}ms</span>;
@@ -204,11 +235,20 @@ export default function LogsViewer() {
 
     const log = selectedLog;
     const isApi = activeTab === 'api';
+
+    const getStatusCodeColor = (code) => {
+      if (code >= 500) return 'text-rose-600 bg-rose-50';
+      if (code >= 400) return 'text-amber-600 bg-amber-50';
+      if (code >= 300) return 'text-blue-600 bg-blue-50';
+      if (code >= 200) return 'text-emerald-600 bg-emerald-50';
+      return 'text-surface-600 bg-surface-50';
+    };
+
     const fields = isApi
       ? [
           { label: txt.detail.fields.method, value: log.method },
           { label: txt.detail.fields.url, value: log.url, mono: true },
-          { label: txt.detail.fields.statusCode, value: log.statusCode },
+          { label: txt.detail.fields.statusCode, value: log.statusCode, statusCode: true },
           { label: txt.detail.fields.responseTime, value: `${log.durationMs}ms` },
           { label: txt.detail.fields.timestamp, value: log.timestamp ? new Date(log.timestamp).toLocaleString() : '—' },
           { label: txt.detail.fields.user, value: log.user || '—' },
@@ -216,15 +256,16 @@ export default function LogsViewer() {
       : [
           { label: txt.detail.fields.level, value: log.level },
           { label: txt.detail.fields.timestamp, value: log.timestamp ? new Date(log.timestamp).toLocaleString() : '—' },
-          { label: txt.detail.fields.source, value: log.source },
+          { label: txt.detail.fields.source, value: log.source || '—' },
+          { label: txt.detail.fields.event, value: log.event || '—' },
           { label: txt.detail.fields.user, value: log.user || '—' },
           { label: txt.detail.fields.message, value: log.message },
           { label: txt.detail.fields.result, value: log.result || '—' },
         ];
 
     return (
-      <div className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
+      <div className="p-4 space-y-3 overflow-y-auto">
+        <div className="flex items-center justify-between sticky top-0 bg-white z-10">
           <h4 className="text-sm font-bold text-surface-700">{txt.detail.title}</h4>
           <button onClick={() => setSelectedLog(null)} className="p-1 rounded text-surface-400 hover:text-surface-600">
             <X size={14} />
@@ -232,33 +273,37 @@ export default function LogsViewer() {
         </div>
         <div className="space-y-2">
           {fields.map(f => (
-            <div key={f.label} className="flex items-start gap-2">
+            <div key={f.label} className="flex items-start gap-2 flex-wrap">
               <span className="text-[10px] font-bold text-surface-400 uppercase w-24 flex-shrink-0 pt-0.5">{f.label}</span>
-              <span className={`text-xs text-surface-700 break-all ${f.mono ? 'font-mono' : ''}`}>{f.value}</span>
+              {f.statusCode ? (
+                <span className={`inline-block px-2 py-1 rounded text-xs font-bold ${getStatusCodeColor(f.value)}`}>{f.value}</span>
+              ) : (
+                <span className={`text-xs text-surface-700 break-all flex-1 ${f.mono ? 'font-mono' : ''}`}>{f.value}</span>
+              )}
             </div>
           ))}
         </div>
         {isApi && log.requestPayload && (
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.requestBody}</p>
-            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px]">
-              {JSON.stringify(log.requestPayload, null, 2)}
+            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px] whitespace-pre-wrap break-words">
+              {formatSanitizedJson(log.requestPayload)}
             </pre>
           </div>
         )}
         {isApi && log.responsePayload && (
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.responseBody}</p>
-            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px]">
-              {JSON.stringify(log.responsePayload, null, 2)}
+            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px] whitespace-pre-wrap break-words">
+              {formatSanitizedJson(log.responsePayload)}
             </pre>
           </div>
         )}
         {!isApi && log.data && (
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.data}</p>
-            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px]">
-              {typeof log.data === 'string' ? log.data : JSON.stringify(log.data, null, 2)}
+            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px] whitespace-pre-wrap break-words">
+              {typeof log.data === 'string' ? log.data : formatSanitizedJson(log.data)}
             </pre>
           </div>
         )}
@@ -341,66 +386,128 @@ export default function LogsViewer() {
       </Card>
 
       {/* Table + Detail Panel */}
-      <div className="flex-1 flex gap-4 min-h-0">
-        <div className="flex-1 overflow-y-auto border border-surface-200 rounded-lg bg-white">
-          {filteredLogs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-surface-300">
-              <ScrollText size={32} className="mb-3" />
-              <p className="text-sm font-medium">{activeTab === 'system' ? txt.empty.system : txt.empty.api}</p>
+      <div className="flex-1 flex gap-4 min-h-0 flex-col">
+        <div className="flex-1 flex gap-4 min-h-0">
+          <div className="flex-1 overflow-hidden border border-surface-200 rounded-lg bg-white flex flex-col">
+            {filteredLogs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-surface-300 flex-1">
+                <ScrollText size={32} className="mb-3" />
+                <p className="text-sm font-medium">{activeTab === 'system' ? txt.empty.system : txt.empty.api}</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 overflow-x-auto overflow-y-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="sticky top-0 bg-surface-50 z-10">
+                      <tr className="border-b border-surface-200">
+                        {colDefs.map((col) => {
+                          const isSorted = sortConfig.key === col.id;
+                          return (
+                            <th
+                              key={col.id}
+                              onClick={() => handleSort(col.id)}
+                              className="text-left px-3 py-2.5 font-semibold text-surface-500 select-none cursor-pointer group hover:bg-surface-100 transition-colors whitespace-nowrap"
+                              style={col.width > 0 ? { minWidth: col.width } : { minWidth: '100px' }}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>{col.label}</span>
+                                {isSorted && (
+                                  sortConfig.direction === 'asc'
+                                    ? <ArrowUp size={11} className="text-brand-500 flex-shrink-0" />
+                                    : <ArrowDown size={11} className="text-brand-500 flex-shrink-0" />
+                                )}
+                              </div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedLogs.map((log) => {
+                        const isSelected = selectedLog?.id === log.id;
+                        return (
+                          <tr
+                            key={log.id}
+                            onClick={() => setSelectedLog(isSelected ? null : log)}
+                            className={`border-b border-surface-50 cursor-pointer transition-colors ${isSelected ? 'bg-brand-50/50' : 'hover:bg-surface-50'}`}
+                          >
+                            {colDefs.map((col) => (
+                              <td key={col.id} className="px-3 py-2 text-xs break-words">
+                                {activeTab === 'system' ? renderSystemCell(log, col.id) : renderApiCell(log, col.id)}
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Right Detail Panel */}
+          {selectedLog && (
+            <div className="w-[380px] flex-shrink-0 border border-surface-200 rounded-lg bg-white overflow-hidden flex flex-col">
+              {renderDetailPanel()}
             </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-surface-50 z-10">
-                <tr className="border-b border-surface-200">
-                  {colDefs.map((col) => {
-                    const isSorted = sortConfig.key === col.id;
-                    return (
-                      <th
-                        key={col.id}
-                        onClick={() => handleSort(col.id)}
-                        className="text-left px-3 py-2.5 font-semibold text-surface-500 select-none cursor-pointer group"
-                        style={col.width > 0 ? { width: col.width } : {}}
-                      >
-                        <div className="flex items-center gap-1">
-                          <span className="truncate">{col.label}</span>
-                          {isSorted && (
-                            sortConfig.direction === 'asc'
-                              ? <ArrowUp size={11} className="text-brand-500 flex-shrink-0" />
-                              : <ArrowDown size={11} className="text-brand-500 flex-shrink-0" />
-                          )}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLogs.map((log) => {
-                  const isSelected = selectedLog?.id === log.id;
-                  return (
-                    <tr
-                      key={log.id}
-                      onClick={() => setSelectedLog(isSelected ? null : log)}
-                      className={`border-b border-surface-50 cursor-pointer transition-colors ${isSelected ? 'bg-brand-50/50' : 'hover:bg-surface-50'}`}
-                    >
-                      {colDefs.map((col) => (
-                        <td key={col.id} className={`px-3 py-2 ${col.id === 'message' || col.id === 'url' ? 'whitespace-normal break-words max-w-[300px]' : 'overflow-hidden text-ellipsis whitespace-nowrap'}`}>
-                          {activeTab === 'system' ? renderSystemCell(log, col.id) : renderApiCell(log, col.id)}
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           )}
         </div>
 
-        {/* Right Detail Panel */}
-        {selectedLog && (
-          <div className="w-[340px] flex-shrink-0 border border-surface-200 rounded-lg bg-white overflow-y-auto">
-            {renderDetailPanel()}
-          </div>
+        {/* Pagination Controls */}
+        {filteredLogs.length > 0 && (
+          <Card variant="flat" className="p-3 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-surface-500">
+                Showing <span className="font-semibold text-surface-700">{((currentPage - 1) * PAGE_SIZE) + 1}</span> to <span className="font-semibold text-surface-700">{Math.min(currentPage * PAGE_SIZE, filteredLogs.length)}</span> of <span className="font-semibold text-surface-700">{filteredLogs.length}</span> entries
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-lg border border-surface-200 text-surface-400 hover:text-surface-600 hover:bg-surface-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  title="Previous page"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-brand-100 text-brand-700 ring-1 ring-brand-300'
+                            : 'bg-surface-50 text-surface-500 hover:bg-surface-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded-lg border border-surface-200 text-surface-400 hover:text-surface-600 hover:bg-surface-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  title="Next page"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          </Card>
         )}
       </div>
     </div>
