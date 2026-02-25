@@ -82,19 +82,33 @@ const AuthService = {
   /**
    * Get the currently authenticated user from the backend.
    * Returns null if not authenticated.
+   * Logs API call for audit purposes.
    */
   async getCurrentUser() {
     const token = ApiClient.getToken();
-    if (!token) return null;
+    if (!token) {
+      Logger.debug('AuthService', 'No token found - skipping session check');
+      return null;
+    }
 
     try {
+      Logger.debug('AuthService', 'Validating existing session token');
       const response = await ApiClient.get('/auth/me');
+      
       if (response.success && response.data) {
         Logger.setUser(response.data.email);
+        Logger.info('AuthService', 'Session restored successfully', { 
+          userId: response.data.id, 
+          email: response.data.email,
+          role: response.data.role 
+        });
         return response.data;
       }
+      
+      Logger.warn('AuthService', 'Session validation failed - invalid or expired token');
       return null;
-    } catch {
+    } catch (error) {
+      Logger.warn('AuthService', 'Session check failed', { error: error.message });
       return null;
     }
   },

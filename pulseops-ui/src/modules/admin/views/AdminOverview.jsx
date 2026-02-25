@@ -48,10 +48,11 @@ function MiniStat({ label, value, mono, valueColor }) {
 
 export default function AdminOverview({ user, onNavigate }) {
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
-  const [dbReachable, setDbReachable] = useState(false);
-  const [dbInitialized, setDbInitialized] = useState(false);
+  const [systemHealth, setSystemHealth] = useState({ status: 'checking', uptime: 0 });
+  const [dbConnection, setDbConnection] = useState({ status: 'checking', latencyMs: 0 });
+  const [apiHealth, setApiHealth] = useState({ status: 'checking' });
+  const [dbInitialized, setDbInitialized] = useState({ status: 'checking', tableCount: 0 });
   const [dbStats, setDbStats] = useState({ userCount: 0, logCount: 0, configCount: 0, tableCount: 0 });
-  const [connectionStatus, setConnectionStatus] = useState({ latencyMs: 0 });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [activitySearch, setActivitySearch] = useState('');
@@ -69,32 +70,67 @@ export default function AdminOverview({ user, onNavigate }) {
     if (showProgress) { setIsRefreshing(true); setRefreshProgress(10); }
     setDbStatsLoading(true);
     try {
-      if (showProgress) setRefreshProgress(30);
+      if (showProgress) setRefreshProgress(20);
       const withTimeout = (promise, ms = 5000) => Promise.race([
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error('Request timeout')), ms))
       ]);
 
-      const [healthRes, statsRes] = await Promise.all([
+      // Fetch all health metrics in parallel
+      const [healthRes, readinessRes, schemaRes, statsRes] = await Promise.all([
         withTimeout(ApiClient.get('/health')).catch(() => ({ success: false })),
+        withTimeout(ApiClient.get('/health/readiness')).catch(() => ({ success: false })),
+        withTimeout(ApiClient.get('/database/schema-status')).catch(() => ({ success: false })),
         withTimeout(ApiClient.get('/database/stats')).catch(() => ({ success: false })),
       ]);
 
-      if (showProgress) setRefreshProgress(70);
+      if (showProgress) setRefreshProgress(60);
 
-      const isReachable = healthRes?.success !== false && healthRes?.status !== undefined;
-      setDbReachable(isReachable);
-      setConnectionStatus({ latencyMs: healthRes?.data?.latencyMs || 0 });
+      // System Health (API health check)
+      if (healthRes?.success && healthRes?.data) {
+        setSystemHealth({
+          status: healthRes.data.status === 'healthy' ? 'healthy' : 'unhealthy',
+          uptime: healthRes.data.uptime || 0,
+        });
+        setApiHealth({ status: 'healthy' });
+      } else {
+        setSystemHealth({ status: 'unhealthy', uptime: 0 });
+        setApiHealth({ status: 'unhealthy' });
+      }
 
+      // Database Connection
+      if (readinessRes?.success && readinessRes?.data) {
+        setDbConnection({
+          status: readinessRes.data.database === 'connected' ? 'connected' : 'disconnected',
+          latencyMs: readinessRes.data.latencyMs || 0,
+        });
+      } else {
+        setDbConnection({ status: 'disconnected', latencyMs: 0 });
+      }
+
+      // Database Initialized
+      if (schemaRes?.success && schemaRes?.data) {
+        setDbInitialized({
+          status: schemaRes.data.initialized ? 'initialized' : 'notInitialized',
+          tableCount: schemaRes.data.tableCount || 0,
+        });
+      } else {
+        setDbInitialized({ status: 'notInitialized', tableCount: 0 });
+      }
+
+      // Database Stats
       if (statsRes?.success && statsRes?.data) {
         setDbStats(statsRes.data);
-        setDbInitialized(statsRes.data.tableCount > 0 || statsRes.data.userCount > 0);
       }
 
       if (showProgress) setRefreshProgress(100);
-      Logger.info('Platform Admin - Overview', 'Stats loaded', { dbReachable: isReachable });
+      Logger.info('Admin Dashboard - Summary', 'System health metrics loaded', { 
+        systemHealth: systemHealth.status, 
+        dbConnection: dbConnection.status,
+        dbInitialized: dbInitialized.status 
+      });
     } catch (err) {
-      Logger.error('Platform Admin - Overview', 'Failed to load stats', { error: err.message });
+      Logger.error('Admin Dashboard - Summary', 'Failed to load system health metrics', { error: err.message });
     } finally {
       setDbStatsLoading(false);
       if (showProgress) {
@@ -121,17 +157,96 @@ export default function AdminOverview({ user, onNavigate }) {
         icon={LayoutDashboard}
       />
 
-      {/* Row 1: Key Metrics */}
+      {/* Row 1: System Health Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         <StatCard
           icon={<Zap size={20} className="text-emerald-500" />}
           label={txt.tiles.systemHealth.label}
-          value={dbReachable ? txt.tiles.systemHealth.operational : (dbStatsLoading ? txt.tiles.systemHealth.checking : txt.tiles.systemHealth.degraded)}
-          gradient={dbReachable ? 'from-emerald-50 to-teal-50' : 'from-amber-50 to-orange-50'}
-          detail={dbReachable ? (dbInitialized ? txt.tiles.systemHealth.allServicesRunning : 'Database connected — initialization needed') : (dbStatsLoading ? txt.tiles.systemHealth.connectingToDb : txt.tiles.systemHealth.cannotReachDb)}
-          glow={dbReachable ? 'shadow-emerald-100/60' : 'shadow-amber-100/60'}
-          borderGradient={dbReachable ? 'from-emerald-300 to-teal-300' : 'from-amber-300 to-orange-300'}
+          value={
+            dbStatsLoading 
+              ? txt.tiles.systemHealth.checking 
+              : systemHealth.status === 'healthy' 
+                ? txt.tiles.systemHealth.healthy 
+                : txt.tiles.systemHealth.unhealthy
+          }
+          gradient={systemHealth.status === 'healthy' ? 'from-emerald-50 to-teal-50' : 'from-rose-50 to-red-50'}
+          detail={
+            dbStatsLoading 
+              ? 'Checking system status...' 
+              : systemHealth.status === 'healthy' 
+                ? `Uptime: ${Math.floor(systemHealth.uptime / 60)}m ${Math.floor(systemHealth.uptime % 60)}s` 
+                : 'System health check failed'
+          }
+          glow={systemHealth.status === 'healthy' ? 'shadow-emerald-100/60' : 'shadow-rose-100/60'}
+          borderGradient={systemHealth.status === 'healthy' ? 'from-emerald-300 to-teal-300' : 'from-rose-300 to-red-300'}
         />
+        <StatCard
+          icon={<Database size={20} className="text-blue-500" />}
+          label={txt.tiles.dbConnection.label}
+          value={
+            dbStatsLoading 
+              ? txt.tiles.dbConnection.checking 
+              : dbConnection.status === 'connected' 
+                ? txt.tiles.dbConnection.connected 
+                : txt.tiles.dbConnection.disconnected
+          }
+          gradient={dbConnection.status === 'connected' ? 'from-blue-50 to-indigo-50' : 'from-amber-50 to-orange-50'}
+          detail={
+            dbStatsLoading 
+              ? 'Testing connection...' 
+              : dbConnection.status === 'connected' 
+                ? `Latency: ${dbConnection.latencyMs}ms` 
+                : 'Cannot reach database'
+          }
+          glow={dbConnection.status === 'connected' ? 'shadow-blue-100/60' : 'shadow-amber-100/60'}
+          borderGradient={dbConnection.status === 'connected' ? 'from-blue-300 to-indigo-300' : 'from-amber-300 to-orange-300'}
+        />
+        <StatCard
+          icon={<Activity size={20} className="text-purple-500" />}
+          label={txt.tiles.apiHealth.label}
+          value={
+            dbStatsLoading 
+              ? txt.tiles.apiHealth.checking 
+              : apiHealth.status === 'healthy' 
+                ? txt.tiles.apiHealth.healthy 
+                : txt.tiles.apiHealth.unhealthy
+          }
+          gradient={apiHealth.status === 'healthy' ? 'from-purple-50 to-pink-50' : 'from-rose-50 to-red-50'}
+          detail={
+            dbStatsLoading 
+              ? 'Checking API health...' 
+              : apiHealth.status === 'healthy' 
+                ? 'All API endpoints responding' 
+                : 'API health check failed'
+          }
+          glow={apiHealth.status === 'healthy' ? 'shadow-purple-100/60' : 'shadow-rose-100/60'}
+          borderGradient={apiHealth.status === 'healthy' ? 'from-purple-300 to-pink-300' : 'from-rose-300 to-red-300'}
+        />
+        <StatCard
+          icon={<CheckCircle2 size={20} className="text-teal-500" />}
+          label={txt.tiles.dbInitialized.label}
+          value={
+            dbStatsLoading 
+              ? txt.tiles.dbInitialized.checking 
+              : dbInitialized.status === 'initialized' 
+                ? txt.tiles.dbInitialized.initialized 
+                : txt.tiles.dbInitialized.notInitialized
+          }
+          gradient={dbInitialized.status === 'initialized' ? 'from-teal-50 to-cyan-50' : 'from-amber-50 to-orange-50'}
+          detail={
+            dbStatsLoading 
+              ? 'Checking schema...' 
+              : dbInitialized.status === 'initialized' 
+                ? `${dbInitialized.tableCount} tables created` 
+                : 'Schema not initialized'
+          }
+          glow={dbInitialized.status === 'initialized' ? 'shadow-teal-100/60' : 'shadow-amber-100/60'}
+          borderGradient={dbInitialized.status === 'initialized' ? 'from-teal-300 to-cyan-300' : 'from-amber-300 to-orange-300'}
+        />
+      </div>
+
+      {/* Row 2: Additional Metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
         <StatCard
           icon={<Activity size={20} className="text-indigo-500" />}
           label={txt.tiles.modules.label}
@@ -169,6 +284,15 @@ export default function AdminOverview({ user, onNavigate }) {
             </Button>
           }
         />
+        <StatCard
+          icon={<BarChart3 size={20} className="text-emerald-500" />}
+          label="API Calls"
+          value={String(logStats.apiTotal)}
+          gradient="from-emerald-50 to-green-50"
+          detail={`${Logger.getApiLogs().filter(l => l.success).length} successful`}
+          glow="shadow-emerald-100/60"
+          borderGradient="from-emerald-300 to-green-300"
+        />
       </div>
 
       {/* Gradient Separator */}
@@ -185,7 +309,7 @@ export default function AdminOverview({ user, onNavigate }) {
           </h3>
           <div className="flex items-center gap-2">
             {dbStatsLoading && <RefreshCw size={12} className="text-surface-300 animate-spin" />}
-            {dbReachable ? (
+            {dbConnection.status === 'connected' ? (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">{txt.databaseObjects.connected}</span>
             ) : (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">{txt.databaseObjects.checking}</span>

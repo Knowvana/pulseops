@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  ScrollText, Search, Filter, Trash2, RefreshCw, X, Globe,
+  ScrollText, Search, Filter, Trash2, RefreshCw, X, Globe, Database,
   CheckCircle2, XCircle, ArrowUp, ArrowDown, GripVertical, Clock, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import Card from '@shared/components/Card';
 import Button from '@shared/components/Button';
 import PageHeader from '@shared/components/PageHeader';
 import Logger from '@shared/services/logger';
+import ApiClient from '@shared/services/apiClient';
 import { sanitizeData, formatSanitizedJson } from '@shared/utils/logSanitizer';
 import uiText from '@shared/config/uiElementsText.json';
 
@@ -35,6 +36,7 @@ const SYSTEM_COLUMNS = [
   { id: 'user',      label: txt.columns.user,      width: 100 },
   { id: 'message',   label: txt.columns.message,   width: 0 },
   { id: 'result',    label: txt.columns.result,    width: 75 },
+  { id: 'synced',    label: txt.columns.synced,    width: 60 },
 ];
 
 const API_COLUMNS = [
@@ -44,7 +46,11 @@ const API_COLUMNS = [
   { id: 'respTime',  label: txt.columns.responseTime, width: 95 },
   { id: 'timestamp', label: txt.columns.timestamp,    width: 95 },
   { id: 'result',    label: txt.columns.result,       width: 65 },
+  { id: 'synced',    label: txt.columns.synced,       width: 60 },
 ];
+
+// Database logs use same columns as API logs
+const DB_LOGS_COLUMNS = API_COLUMNS;
 
 function getSortValue(log, colId, tab) {
   if (tab === 'system') {
@@ -57,6 +63,7 @@ function getSortValue(log, colId, tab) {
       case 'user': return log.user || '';
       case 'message': return log.message || '';
       case 'result': return log.result || '';
+      case 'synced': return log.synced ? 1 : 0;
       default: return '';
     }
   } else {
@@ -67,6 +74,7 @@ function getSortValue(log, colId, tab) {
       case 'respTime': return log.durationMs || 0;
       case 'timestamp': return log.timestamp || '';
       case 'result': return log.success ? 1 : 0;
+      case 'synced': return log.synced ? 1 : 0;
       default: return '';
     }
   }
@@ -78,6 +86,8 @@ export default function LogsViewer() {
   const [activeTab, setActiveTab] = useState('system');
   const [logs, setLogs] = useState([]);
   const [apiLogs, setApiLogs] = useState([]);
+  const [dbLogs, setDbLogs] = useState([]);
+  const [isLoadingDbLogs, setIsLoadingDbLogs] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [selectedLog, setSelectedLog] = useState(null);
@@ -90,14 +100,49 @@ export default function LogsViewer() {
     setApiLogs([...Logger.getApiLogs()]);
   }, []);
 
+  const loadDatabaseLogs = useCallback(async () => {
+    setIsLoadingDbLogs(true);
+    try {
+      const response = await ApiClient.get('/logs/database?limit=500');
+      if (response.success && response.data?.logs) {
+        // Transform database logs to API log format
+        const transformedLogs = response.data.logs.map(log => ({
+          id: log.id,
+          timestamp: log.timestamp,
+          method: log.httpMethod || 'GET',
+          url: log.apiUrl || log.event || '',
+          path: log.apiUrl || log.event || '',
+          statusCode: log.responseCode || 200,
+          durationMs: log.durationMs || 0,
+          success: log.result === 'success',
+          requestPayload: log.requestBody || null,
+          responsePayload: log.responseBody || null,
+          user: log.userEmail || 'system',
+          synced: true, // Database logs are already synced
+        }));
+        setDbLogs(transformedLogs);
+      }
+    } catch (err) {
+      Logger.error('LogsViewer', 'Failed to load database logs', { error: err.message });
+    } finally {
+      setIsLoadingDbLogs(false);
+    }
+  }, []);
+
   useEffect(() => {
     syncFromMemory();
     const unsub = Logger.subscribe(syncFromMemory);
     return unsub;
   }, [syncFromMemory]);
 
+  useEffect(() => {
+    if (activeTab === 'database') {
+      loadDatabaseLogs();
+    }
+  }, [activeTab, loadDatabaseLogs]);
+
   const filteredLogs = useMemo(() => {
-    const source = activeTab === 'system' ? logs : apiLogs;
+    const source = activeTab === 'system' ? logs : activeTab === 'api' ? apiLogs : dbLogs;
     let filtered = source.filter((log) => {
       if (activeTab === 'system' && levelFilter !== 'all' && log.level !== levelFilter) return false;
       if (searchText) {
@@ -119,7 +164,7 @@ export default function LogsViewer() {
       });
     }
     return filtered;
-  }, [logs, apiLogs, activeTab, levelFilter, searchText, sortConfig]);
+  }, [logs, apiLogs, dbLogs, activeTab, levelFilter, searchText, sortConfig]);
 
   const totalPages = Math.ceil(filteredLogs.length / PAGE_SIZE);
   const paginatedLogs = useMemo(() => {
@@ -173,6 +218,10 @@ export default function LogsViewer() {
         const rc = RESULT_CONFIG[log.result] || RESULT_CONFIG.pending;
         return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-bold ${rc.bg} ${rc.color}`}>{log.result || '—'}</span>;
       }
+      case 'synced':
+        return log.synced
+          ? <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Yes</span>
+          : <span className="text-xs font-bold text-surface-400 bg-surface-50 px-1.5 py-0.5 rounded">No</span>;
       default: return '—';
     }
   };
@@ -215,6 +264,10 @@ export default function LogsViewer() {
         ) : <span className="text-surface-400 text-xs">—</span>;
       case 'timestamp':
         return <span className="font-mono text-surface-400 text-xs">{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '—'}</span>;
+      case 'synced':
+        return log.synced
+          ? <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Yes</span>
+          : <span className="text-xs font-bold text-surface-400 bg-surface-50 px-1.5 py-0.5 rounded">No</span>;
       case 'result':
         return log.success
           ? <CheckCircle2 size={15} className="text-emerald-500" />
@@ -224,17 +277,9 @@ export default function LogsViewer() {
   };
 
   const renderDetailPanel = () => {
-    if (!selectedLog) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full text-surface-300 py-12">
-          <ScrollText size={28} className="mb-2" />
-          <p className="text-xs">{txt.detail.noSelection}</p>
-        </div>
-      );
-    }
-
-    const log = selectedLog;
-    const isApi = activeTab === 'api';
+    if (!selectedLog) return null;
+    
+    const isApi = activeTab === 'api' || activeTab === 'database';
 
     const getStatusCodeColor = (code) => {
       if (code >= 500) return 'text-rose-600 bg-rose-50';
@@ -246,21 +291,21 @@ export default function LogsViewer() {
 
     const fields = isApi
       ? [
-          { label: txt.detail.fields.method, value: log.method },
-          { label: txt.detail.fields.url, value: log.url, mono: true },
-          { label: txt.detail.fields.statusCode, value: log.statusCode, statusCode: true },
-          { label: txt.detail.fields.responseTime, value: `${log.durationMs}ms` },
-          { label: txt.detail.fields.timestamp, value: log.timestamp ? new Date(log.timestamp).toLocaleString() : '—' },
-          { label: txt.detail.fields.user, value: log.user || '—' },
+          { label: txt.detail.fields.method, value: selectedLog.method },
+          { label: txt.detail.fields.url, value: selectedLog.url, mono: true },
+          { label: txt.detail.fields.statusCode, value: selectedLog.statusCode, statusCode: true },
+          { label: txt.detail.fields.responseTime, value: `${selectedLog.durationMs}ms` },
+          { label: txt.detail.fields.timestamp, value: selectedLog.timestamp ? new Date(selectedLog.timestamp).toLocaleString() : '—' },
+          { label: txt.detail.fields.user, value: selectedLog.user || '—' },
         ]
       : [
-          { label: txt.detail.fields.level, value: log.level },
-          { label: txt.detail.fields.timestamp, value: log.timestamp ? new Date(log.timestamp).toLocaleString() : '—' },
-          { label: txt.detail.fields.source, value: log.source || '—' },
-          { label: txt.detail.fields.event, value: log.event || '—' },
-          { label: txt.detail.fields.user, value: log.user || '—' },
-          { label: txt.detail.fields.message, value: log.message },
-          { label: txt.detail.fields.result, value: log.result || '—' },
+          { label: txt.detail.fields.level, value: selectedLog.level },
+          { label: txt.detail.fields.timestamp, value: selectedLog.timestamp ? new Date(selectedLog.timestamp).toLocaleString() : '—' },
+          { label: txt.detail.fields.source, value: selectedLog.source || '—' },
+          { label: txt.detail.fields.event, value: selectedLog.event || '—' },
+          { label: txt.detail.fields.user, value: selectedLog.user || '—' },
+          { label: txt.detail.fields.message, value: selectedLog.message },
+          { label: txt.detail.fields.result, value: selectedLog.result || '—' },
         ];
 
     return (
@@ -283,27 +328,27 @@ export default function LogsViewer() {
             </div>
           ))}
         </div>
-        {isApi && log.requestPayload && (
+        {isApi && selectedLog.requestPayload && (
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.requestBody}</p>
-            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px] whitespace-pre-wrap break-words">
-              {formatSanitizedJson(log.requestPayload)}
+            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words">
+              {formatSanitizedJson(selectedLog.requestPayload)}
             </pre>
           </div>
         )}
-        {isApi && log.responsePayload && (
+        {isApi && selectedLog.responsePayload && (
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.responseBody}</p>
-            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px] whitespace-pre-wrap break-words">
-              {formatSanitizedJson(log.responsePayload)}
+            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words">
+              {formatSanitizedJson(selectedLog.responsePayload)}
             </pre>
           </div>
         )}
-        {!isApi && log.data && (
+        {!isApi && selectedLog.data && (
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.data}</p>
-            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[200px] whitespace-pre-wrap break-words">
-              {typeof log.data === 'string' ? log.data : formatSanitizedJson(log.data)}
+            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words">
+              {typeof selectedLog.data === 'string' ? selectedLog.data : formatSanitizedJson(selectedLog.data)}
             </pre>
           </div>
         )}
@@ -312,33 +357,70 @@ export default function LogsViewer() {
   };
 
   return (
-    <div className="animate-fade-in h-full flex flex-col">
-      <PageHeader title={txt.pageTitle} subtitle={`${filteredLogs.length} entries displayed`} icon={ScrollText} />
+    <div className="animate-fade-in h-screen flex flex-col overflow-hidden">
+      <div className="flex-shrink-0">
+        <PageHeader title={txt.pageTitle} subtitle={`${filteredLogs.length} entries displayed`} icon={ScrollText} />
+      </div>
 
-      {/* Tab Switcher + Toolbar */}
-      <Card variant="flat" className="p-3 mb-4 flex-shrink-0">
+      {/* Tab Switcher + Toolbar + Pagination */}
+      <Card variant="flat" className="p-3 mb-3 flex-shrink-0">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1 mr-2">
-            {[
-              { id: 'system', label: txt.tabs.systemLogs, icon: ScrollText },
-              { id: 'api', label: txt.tabs.apiLogs, icon: Globe },
-            ].map((tab) => {
-              const TabIcon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => { setActiveTab(tab.id); setSelectedLog(null); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    activeTab === tab.id
-                      ? 'bg-brand-100 text-brand-700 ring-1 ring-brand-300'
-                      : 'bg-surface-50 text-surface-400 hover:bg-surface-100'
-                  }`}
-                >
-                  <TabIcon size={13} />
-                  {tab.label}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-3">
+            {/* Current Session Browser Logs */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-surface-400 px-1">{txt.groups.currentSession}</span>
+              <div className="flex items-center gap-1">
+                {[
+                  { id: 'system', label: txt.tabs.systemLogs, icon: ScrollText },
+                  { id: 'api', label: txt.tabs.apiLogs, icon: Globe },
+                ].map((tab) => {
+                  const TabIcon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setSelectedLog(null); }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        activeTab === tab.id
+                          ? 'bg-brand-100 text-brand-700 ring-1 ring-brand-300'
+                          : 'bg-surface-50 text-surface-400 hover:bg-surface-100'
+                      }`}
+                    >
+                      <TabIcon size={13} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Vertical Separator */}
+            <div className="h-12 w-px bg-gradient-to-b from-transparent via-surface-300 to-transparent" />
+
+            {/* Database Logs */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-surface-400 px-1">{txt.groups.database}</span>
+              <div className="flex items-center gap-1">
+                {[
+                  { id: 'database', label: txt.tabs.databaseLogs, icon: Database },
+                ].map((tab) => {
+                  const TabIcon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setSelectedLog(null); }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        activeTab === tab.id
+                          ? 'bg-brand-100 text-brand-700 ring-1 ring-brand-300'
+                          : 'bg-surface-50 text-surface-400 hover:bg-surface-100'
+                      }`}
+                    >
+                      <TabIcon size={13} />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           <div className="relative flex-1 min-w-[180px]">
@@ -357,7 +439,7 @@ export default function LogsViewer() {
             )}
           </div>
 
-          {activeTab === 'system' && (
+          {(activeTab === 'system') && (
             <div className="flex items-center gap-1">
               <Filter size={14} className="text-surface-400" />
               {['all', 'debug', 'info', 'warn', 'error'].map((level) => (
@@ -377,7 +459,31 @@ export default function LogsViewer() {
             </div>
           )}
 
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Pagination Controls */}
+            {filteredLogs.length > 0 && (
+              <div className="flex items-center gap-2 border-l border-surface-200 pl-3">
+                <span className="text-xs text-surface-500">
+                  Page {currentPage} of {totalPages} ({filteredLogs.length} total)
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded text-surface-400 hover:text-brand-600 hover:bg-brand-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 rounded text-surface-400 hover:text-brand-600 hover:bg-brand-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
             <button onClick={handleClear} className="p-2 rounded-lg text-surface-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title={txt.toolbar.clearTooltip}>
               <Trash2 size={14} />
             </button>
@@ -386,13 +492,18 @@ export default function LogsViewer() {
       </Card>
 
       {/* Table + Detail Panel */}
-      <div className="flex-1 flex gap-4 min-h-0 flex-col">
-        <div className="flex-1 flex gap-4 min-h-0">
-          <div className="flex-1 overflow-hidden border border-surface-200 rounded-lg bg-white flex flex-col">
+      <div className="flex-1 flex gap-3 min-h-0">
+          <div className="flex-1 min-w-0 overflow-hidden border border-surface-200 rounded-lg bg-white flex flex-col">
             {filteredLogs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-surface-300 flex-1">
                 <ScrollText size={32} className="mb-3" />
-                <p className="text-sm font-medium">{activeTab === 'system' ? txt.empty.system : txt.empty.api}</p>
+                <p className="text-sm font-medium">
+                  {activeTab === 'database' 
+                    ? (isLoadingDbLogs ? 'Loading database logs...' : 'No logs found in database') 
+                    : activeTab === 'system' 
+                      ? txt.empty.system 
+                      : txt.empty.api}
+                </p>
               </div>
             ) : (
               <>
@@ -448,67 +559,10 @@ export default function LogsViewer() {
 
           {/* Right Detail Panel */}
           {selectedLog && (
-            <div className="w-[380px] flex-shrink-0 border border-surface-200 rounded-lg bg-white overflow-hidden flex flex-col">
+            <div className="w-[420px] flex-shrink-0 border border-surface-200 rounded-lg bg-white overflow-hidden flex flex-col">
               {renderDetailPanel()}
             </div>
           )}
-        </div>
-
-        {/* Pagination Controls */}
-        {filteredLogs.length > 0 && (
-          <Card variant="flat" className="p-3 flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-surface-500">
-                Showing <span className="font-semibold text-surface-700">{((currentPage - 1) * PAGE_SIZE) + 1}</span> to <span className="font-semibold text-surface-700">{Math.min(currentPage * PAGE_SIZE, filteredLogs.length)}</span> of <span className="font-semibold text-surface-700">{filteredLogs.length}</span> entries
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="p-1.5 rounded-lg border border-surface-200 text-surface-400 hover:text-surface-600 hover:bg-surface-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  title="Previous page"
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-2 py-1 rounded text-xs font-semibold transition-all ${
-                          currentPage === pageNum
-                            ? 'bg-brand-100 text-brand-700 ring-1 ring-brand-300'
-                            : 'bg-surface-50 text-surface-500 hover:bg-surface-100'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-1.5 rounded-lg border border-surface-200 text-surface-400 hover:text-surface-600 hover:bg-surface-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  title="Next page"
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          </Card>
-        )}
       </div>
     </div>
   );

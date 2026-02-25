@@ -3,10 +3,16 @@
 //
 // PURPOSE: Logs every incoming HTTP request with method, URL, status code,
 // and latency. Captures request/response bodies for API logging.
-// Persists logs to database asynchronously.
+// Persists logs to database asynchronously with IST timezone.
 // ============================================================================
 import logger, { msg, logMessages } from '../logger.js';
 import { SystemLog } from '../database/models/index.js';
+
+function getISTTimestamp() {
+  const now = new Date();
+  const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  return istTime;
+}
 
 let requestBody = null;
 let responseBody = null;
@@ -71,7 +77,7 @@ async function persistApiLog(req, res, latencyMs, reqBody, respBody) {
     }
 
     await SystemLog.create({
-      timestamp: new Date(),
+      timestamp: getISTTimestamp(),
       level: res.statusCode >= 400 ? 'error' : res.statusCode >= 300 ? 'warn' : 'info',
       source: 'API',
       event: `${req.method} ${req.path}`,

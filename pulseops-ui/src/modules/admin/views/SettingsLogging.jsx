@@ -36,6 +36,7 @@ export default function SettingsLogging() {
   const [captureUiLogs, setCaptureUiLogs] = useState(true);
   const [captureModuleLogs, setCaptureModuleLogs] = useState(true);
   const [maxEntries, setMaxEntries] = useState(currentConfig.maxBufferSize || 500);
+  const [syncLimit, setSyncLimit] = useState(currentConfig.syncLimit || 100);
   const [dbRetention, setDbRetention] = useState(10000);
   const [autoCleanup, setAutoCleanup] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -57,6 +58,7 @@ export default function SettingsLogging() {
       consoleOutput,
       captureApiCalls,
       maxBufferSize: maxEntries,
+      syncLimit,
     });
 
     try {
@@ -67,6 +69,7 @@ export default function SettingsLogging() {
         captureUiLogs,
         captureModuleLogs,
         maxEntries,
+        syncLimit,
         dbRetention,
         autoCleanup,
         moduleLogging: moduleLogging.reduce((acc, m) => { acc[m.id] = m.enabled; return acc; }, {}),
@@ -78,7 +81,7 @@ export default function SettingsLogging() {
 
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  }, [logLevel, consoleOutput, captureApiCalls, captureUiLogs, captureModuleLogs, maxEntries, dbRetention, autoCleanup, moduleLogging]);
+  }, [logLevel, consoleOutput, captureApiCalls, captureUiLogs, captureModuleLogs, maxEntries, syncLimit, dbRetention, autoCleanup, moduleLogging]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -118,6 +121,26 @@ export default function SettingsLogging() {
         <ToggleRow label={txt.captureOptions.apiLogs} description={txt.captureOptions.apiDescription} enabled={captureApiCalls} onToggle={() => setCaptureApiCalls(!captureApiCalls)} />
         <ToggleRow label={txt.captureOptions.uiLogs} description={txt.captureOptions.uiDescription} enabled={captureUiLogs} onToggle={() => setCaptureUiLogs(!captureUiLogs)} />
         <ToggleRow label={txt.captureOptions.moduleLogs} description={txt.captureOptions.moduleDescription} enabled={captureModuleLogs} onToggle={() => setCaptureModuleLogs(!captureModuleLogs)} />
+      </Card>
+
+      {/* Log Sync to Database */}
+      <Card variant="flat" className="p-4">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3">{txt.sync.title}</h4>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-surface-600 mb-1">{txt.sync.limitLabel}</label>
+            <input
+              type="number"
+              value={syncLimit}
+              onChange={(e) => setSyncLimit(Math.max(10, parseInt(e.target.value) || 100))}
+              min={10}
+              max={1000}
+              step={10}
+              className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
+            />
+            <p className="text-[10px] text-surface-400 mt-1">{txt.sync.limitDescription}</p>
+          </div>
+        </div>
       </Card>
 
       {/* Retention */}

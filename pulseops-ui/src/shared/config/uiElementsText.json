@@ -70,18 +70,18 @@
   },
   "platformAdmin": {
     "sideNav": {
-      "title": "Platform Admin",
+      "title": "Admin",
       "subtitle": "System Management"
     },
     "navItems": {
-      "overview": "Overview",
+      "overview": "Summary",
       "users": "Users",
       "modules": "Modules",
       "logs": "Logs",
       "settings": "Settings"
     },
     "overview": {
-      "pageTitle": "Platform Admin - Overview",
+      "pageTitle": "Admin Dashboard - Summary",
       "welcome": "Welcome, {name}",
       "tiles": {
         "systemHealth": {
@@ -89,9 +89,29 @@
           "operational": "Operational",
           "degraded": "Degraded",
           "checking": "Checking...",
+          "healthy": "Healthy",
+          "unhealthy": "Unhealthy",
           "allServicesRunning": "All services running",
           "connectingToDb": "Connecting to database...",
           "cannotReachDb": "Cannot reach database"
+        },
+        "dbConnection": {
+          "label": "Database Connection",
+          "connected": "Connected",
+          "disconnected": "Disconnected",
+          "checking": "Checking..."
+        },
+        "apiHealth": {
+          "label": "API HealthCheck",
+          "healthy": "Healthy",
+          "unhealthy": "Unhealthy",
+          "checking": "Checking..."
+        },
+        "dbInitialized": {
+          "label": "Database Initialized",
+          "initialized": "Initialized",
+          "notInitialized": "Not Initialized",
+          "checking": "Checking..."
         },
         "modules": {
           "label": "Modules",
@@ -169,7 +189,12 @@
       "pageTitle": "Platform Admin - Logs",
       "tabs": {
         "systemLogs": "System Logs",
-        "apiLogs": "API Logs"
+        "apiLogs": "API Logs",
+        "databaseLogs": "Database Logs"
+      },
+      "groups": {
+        "currentSession": "Current Session Browser Logs",
+        "database": "Database Logs"
       },
       "stats": {
         "inDatabase": "In Database",
@@ -205,7 +230,8 @@
         "responseTime": "Response Time",
         "requestBody": "Request Body",
         "responseBody": "Response Body",
-        "timestamp": "Timestamp"
+        "timestamp": "Timestamp",
+        "synced": "Synced"
       },
       "detail": {
         "title": "Log Detail",
@@ -339,6 +365,11 @@
           "uiDescription": "Capture UI interaction and navigation events",
           "moduleLogs": "Module Logs",
           "moduleDescription": "Enable logging for specific modules"
+        },
+        "sync": {
+          "title": "Log Sync to Database",
+          "limitLabel": "Log Sync Limit",
+          "limitDescription": "This is the value after which the UI pushes the logs to database in batches."
         },
         "retention": {
           "title": "Log Retention",

@@ -23,14 +23,20 @@ export default function App() {
 
   useEffect(() => {
     const checkSession = async () => {
+      // Only check session if a token exists in localStorage
+      const hasToken = !!localStorage.getItem('pulseops_token');
+      
+      if (!hasToken) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        if (AuthService.isAuthenticated()) {
-          const currentUser = await AuthService.getCurrentUser();
-          if (currentUser) {
-            setUser(currentUser);
-            Logger.setUser(currentUser);
-            Logger.info('App', logsConfig.messages.auth.loginSuccess, { userId: currentUser.id });
-          }
+        const currentUser = await AuthService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          Logger.setUser(currentUser);
+          Logger.info('App', logsConfig.messages.auth.loginSuccess, { userId: currentUser.id });
         }
       } catch {
         // Token invalid or expired — stay on login

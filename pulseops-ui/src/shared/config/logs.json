@@ -62,6 +62,7 @@
   "config": {
     "minLevel": "info",
     "maxBufferSize": 500,
+    "syncLimit": 100,
     "enableConsole": true,
     "enableRemote": true,
     "remoteFlushIntervalMs": 30000

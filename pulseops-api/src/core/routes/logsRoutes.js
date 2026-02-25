@@ -25,11 +25,15 @@ const router = Router();
  */
 router.get('/system', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    const { level, source, event, userId, limit = 100, offset = 0, search } = req.query;
+    const { level, source, event, userId, limit = 100, offset = 0, search, includeApi = false } = req.query;
     const where = {};
 
     if (level) where.level = level;
-    if (source) where.source = source;
+    if (source) {
+      where.source = source;
+    } else if (includeApi !== 'true') {
+      where.source = { [Op.ne]: 'API' };
+    }
     if (event) where.event = event;
     if (userId) where.userId = userId;
 
@@ -100,67 +104,62 @@ router.get('/api', authenticate, authorize('admin'), async (req, res, next) => {
 });
 
 /**
- * POST /logs/system — Create a system log entry
+ * POST /logs/system — Create system log entry/entries
  */
 router.post('/system', authenticate, async (req, res, next) => {
   try {
-    const { level, source, event, message, result, metadata } = req.body;
+    const logs = Array.isArray(req.body) ? req.body : [req.body];
 
-    const log = await SystemLog.create({
-      timestamp: new Date(),
-      level: level || 'info',
-      source: source || 'UI',
-      event: event || 'Unknown',
-      message: message || '',
-      userId: req.user?.id || null,
-      userEmail: req.user?.email || null,
-      result: result || 'success',
-      metadata: metadata || null,
-    });
+    const createdLogs = await Promise.all(logs.map(logData => 
+      SystemLog.create({
+        timestamp: logData.timestamp ? new Date(logData.timestamp) : new Date(),
+        level: logData.level || 'info',
+        source: logData.source || 'UI',
+        event: logData.event || 'Unknown',
+        message: logData.message || '',
+        userId: req.user?.id || null,
+        userEmail: req.user?.email || null,
+        result: logData.result || 'success',
+        metadata: logData.metadata || logData.data || null,
+      })
+    ));
 
     res.status(201).json({
       success: true,
-      data: log,
+      data: Array.isArray(req.body) ? createdLogs : createdLogs[0],
     });
   } catch (err) { next(err); }
 });
 
 /**
- * POST /logs/api — Create an API log entry
+ * POST /logs/api — Create API log entry/entries
  */
 router.post('/api', authenticate, async (req, res, next) => {
   try {
-    const {
-      httpMethod,
-      apiUrl,
-      responseCode,
-      durationMs,
-      requestBody,
-      responseBody,
-      message,
-      result,
-    } = req.body;
+    const logs = Array.isArray(req.body) ? req.body : [req.body];
 
-    const log = await SystemLog.create({
-      timestamp: new Date(),
-      level: responseCode >= 400 ? 'error' : responseCode >= 300 ? 'warn' : 'info',
-      source: 'API',
-      event: `${httpMethod} ${apiUrl}`,
-      message: message || `API call to ${apiUrl}`,
-      userId: req.user?.id || null,
-      userEmail: req.user?.email || null,
-      result: result || (responseCode >= 400 ? 'failure' : 'success'),
-      apiUrl: apiUrl || null,
-      httpMethod: httpMethod || null,
-      responseCode: responseCode || null,
-      durationMs: durationMs || null,
-      requestBody: requestBody || null,
-      responseBody: responseBody || null,
-    });
+    const createdLogs = await Promise.all(logs.map(logData => 
+      SystemLog.create({
+        timestamp: logData.timestamp ? new Date(logData.timestamp) : new Date(),
+        level: logData.responseCode >= 400 ? 'error' : logData.responseCode >= 300 ? 'warn' : 'info',
+        source: 'API',
+        event: logData.event || `${logData.httpMethod || logData.method} ${logData.apiUrl || logData.path || logData.url}`,
+        message: logData.message || `API call to ${logData.apiUrl || logData.path || logData.url}`,
+        userId: req.user?.id || null,
+        userEmail: req.user?.email || null,
+        result: logData.result || (logData.responseCode >= 400 ? 'failure' : 'success'),
+        apiUrl: logData.apiUrl || logData.path || logData.url || null,
+        httpMethod: logData.httpMethod || logData.method || null,
+        responseCode: logData.responseCode || logData.statusCode || null,
+        durationMs: logData.durationMs || null,
+        requestBody: logData.requestBody || logData.requestPayload || null,
+        responseBody: logData.responseBody || logData.responsePayload || null,
+      })
+    ));
 
     res.status(201).json({
       success: true,
-      data: log,
+      data: Array.isArray(req.body) ? createdLogs : createdLogs[0],
     });
   } catch (err) { next(err); }
 });
@@ -216,6 +215,45 @@ router.delete('/api', authenticate, authorize('admin'), async (req, res, next) =
       data: {
         message: `Deleted ${result} API logs older than ${olderThanDays} days`,
         deletedCount: result,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /logs/database — Retrieve all logs from database (both system and API)
+ */
+router.get('/database', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    const { level, source, limit = 500, offset = 0, search } = req.query;
+    const where = {};
+
+    if (level) where.level = level;
+    if (source) where.source = source;
+
+    if (search) {
+      where[Op.or] = [
+        { message: { [Op.iLike]: `%${search}%` } },
+        { event: { [Op.iLike]: `%${search}%` } },
+        { userEmail: { [Op.iLike]: `%${search}%` } },
+        { apiUrl: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+
+    const { count, rows } = await SystemLog.findAndCountAll({
+      where,
+      order: [['timestamp', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    res.json({
+      success: true,
+      data: {
+        logs: rows,
+        total: count,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
       },
     });
   } catch (err) { next(err); }

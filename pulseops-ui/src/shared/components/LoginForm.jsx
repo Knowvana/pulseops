@@ -21,8 +21,8 @@ import messages from '@shared/config/messages.json';
 const txt = uiText.login;
 
 export default function LoginForm({ onLogin, isLoading = false }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('Admin@123');
+  const [password, setPassword] = useState('Password@123');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
 
