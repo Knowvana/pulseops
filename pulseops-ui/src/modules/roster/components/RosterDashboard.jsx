@@ -1,0 +1,334 @@
+// ============================================================================
+// RosterDashboard Component — PulseOps UI
+//
+// PURPOSE: Main planner grid for the Shift Roster module. Displays the
+// generated schedule in daily, weekly, or monthly view modes. Supports
+// inline editing of shift assignments via a floating modal.
+//
+// ARCHITECTURE: Module-specific component. Uses roster utils for date keys.
+// All UI elements follow the shared brand/surface color palette.
+// ============================================================================
+import React, { useState } from 'react';
+import {
+  List, CalendarDays, Grid, ChevronLeft, ChevronRight,
+  RefreshCw, Download, Users, AlertCircle, Edit2, X, Save, CheckCircle2
+} from 'lucide-react';
+import { getSafeDateKey } from '@modules/roster/utils/rosterUtils';
+import { WEEKDAYS } from '@modules/roster/utils/rosterConstants';
+
+// --- Edit Modal Component ---
+const EditShiftModal = ({ isOpen, onClose, dateKey, shift, assignedIds, employees, onSave }) => {
+  const [selected, setSelected] = useState([]);
+
+  React.useEffect(() => {
+    if (isOpen) setSelected(assignedIds || []);
+  }, [isOpen, assignedIds]);
+
+  if (!isOpen || !shift) return null;
+
+  const toggleEmp = (id) => {
+    if (selected.includes(id)) setSelected(selected.filter(e => e !== id));
+    else setSelected([...selected, id]);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-surface-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[85vh]">
+        <div className={`p-6 border-b border-surface-100 flex justify-between items-center ${shift.color} bg-opacity-10 shrink-0`}>
+          <div>
+            <h3 className="text-xl font-extrabold text-surface-800 tracking-tight flex items-center gap-2">
+              Edit {shift.label}
+            </h3>
+            <p className="text-xs font-medium text-surface-500 mt-1">Date: <span className="font-mono">{dateKey}</span> • Time: <span className="font-mono">{shift.time}</span></p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-white/50 text-surface-500 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-surface-50/50">
+          <p className="text-[10px] font-bold text-surface-400 uppercase tracking-widest mb-3 ml-2">Select Staff</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {employees.map(emp => {
+              const isSelected = selected.includes(emp.id);
+              return (
+                <div
+                  key={emp.id}
+                  onClick={() => toggleEmp(emp.id)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                    isSelected
+                      ? 'bg-brand-50 border-brand-200 shadow-sm'
+                      : 'bg-white border-surface-200 hover:border-brand-300 hover:bg-surface-50'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${
+                    isSelected ? 'bg-brand-500 border-brand-600 text-white' : 'bg-surface-50 border-surface-300'
+                  }`}>
+                    {isSelected && <CheckCircle2 size={14} strokeWidth={3} />}
+                  </div>
+                  <span className={`text-sm font-semibold truncate ${isSelected ? 'text-brand-900' : 'text-surface-700'}`}>{emp.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="p-5 bg-white border-t border-surface-100 flex justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-sm font-bold text-surface-500 hover:bg-surface-50 transition-colors">Cancel</button>
+          <button onClick={() => onSave(selected)} className="px-6 py-2.5 rounded-xl text-sm font-bold bg-surface-800 text-white shadow-lg hover:bg-surface-900 active:scale-95 transition-all flex items-center gap-2">
+            <Save size={16} /> Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function RosterDashboard({
+  schedule, employees, shifts, viewMode, setViewMode,
+  currentDate, navigateDate, getDisplayDateRange,
+  handleGenerate, downloadCSV, generationError, onUpdateSchedule
+}) {
+  const [editingShift, setEditingShift] = useState(null);
+
+  const openEditModal = (dateKey, shiftId, currentWorkers) => {
+    setEditingShift({ dateKey, shiftId, currentWorkers });
+  };
+
+  const handleSaveEdit = (newWorkers) => {
+    onUpdateSchedule(editingShift.dateKey, editingShift.shiftId, newWorkers);
+    setEditingShift(null);
+  };
+
+  const renderDailyView = () => {
+    const dateKey = getSafeDateKey(currentDate);
+    const daySchedule = schedule?.[dateKey] || {};
+    const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {shifts.map(shift => {
+          const workers = daySchedule[shift.id] || [];
+          const required = isWeekend ? shift.reqWeekend : shift.reqWeekday;
+          return (
+            <div
+              key={shift.id}
+              onClick={() => openEditModal(dateKey, shift.id, workers)}
+              className={`group bg-white rounded-2xl border ${shift.color.replace('bg-', 'border-').split(' ')[2]} shadow-sm overflow-hidden flex flex-col transition-all duration-300 hover:shadow-md cursor-pointer hover:ring-2 ring-brand-500/20`}
+            >
+              <div className={`p-4 border-b flex justify-between items-center ${shift.color} bg-opacity-20`}>
+                <div>
+                  <h3 className="font-extrabold text-lg tracking-tight">{shift.label}</h3>
+                  <p className="text-xs opacity-80 font-mono mt-0.5">{shift.time}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-white/60 rounded-full text-brand-700 backdrop-blur-sm shadow-sm">
+                    <Edit2 size={16} />
+                  </div>
+                  <div className="text-right flex flex-col items-end">
+                    <span className="text-2xl font-black tracking-tighter leading-none">{workers.length}</span>
+                    <span className="text-[10px] font-bold opacity-80 mt-1 uppercase tracking-wider">/ {required} Req</span>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 flex-1 bg-surface-50/30">
+                {workers.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {workers.map(empId => {
+                      const emp = employees.find(e => e.id === empId);
+                      return (
+                        <div key={empId} className="flex items-center gap-2.5 p-2 rounded-xl bg-white border border-surface-200 shadow-sm">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-inner ${shift.color.split(' ')[0].replace('100', '500')}`}>
+                            {emp?.name.charAt(0)}
+                          </div>
+                          <span className="font-bold text-sm text-surface-700 truncate">{emp?.name || 'Unknown'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="h-24 flex items-center justify-center text-surface-400 italic text-sm font-medium bg-white rounded-xl border border-dashed border-surface-200">Click to assign staff</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderWeeklyView = () => {
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
+      weekDays.push(d);
+    }
+
+    return (
+      <div className="space-y-4">
+        {weekDays.map(dateObj => {
+          const dateKey = getSafeDateKey(dateObj);
+          const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+          const daySchedule = schedule?.[dateKey] || {};
+
+          return (
+            <div key={dateKey} className={`bg-white rounded-2xl border ${isWeekend ? 'border-orange-200 bg-orange-50/10' : 'border-surface-200'} shadow-sm overflow-hidden`}>
+              <div className={`px-5 py-3 border-b flex justify-between items-center ${isWeekend ? 'bg-orange-50/40' : 'bg-surface-50/50'}`}>
+                <div className="flex items-baseline gap-3">
+                  <span className={`text-lg font-extrabold tracking-tight ${isWeekend ? 'text-orange-800' : 'text-surface-800'}`}>{WEEKDAYS[dateObj.getDay()]}</span>
+                  <span className="text-xs font-medium text-surface-500">{dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+                {isWeekend && <span className="text-[10px] uppercase font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-md tracking-wider border border-orange-200">Weekend</span>}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-surface-100">
+                {shifts.map(shift => {
+                  const workers = daySchedule[shift.id] || [];
+                  return (
+                    <div
+                      key={shift.id}
+                      onClick={() => openEditModal(dateKey, shift.id, workers)}
+                      className="p-4 cursor-pointer group hover:bg-brand-50/30 transition-colors relative"
+                    >
+                      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-brand-500 transition-opacity"><Edit2 size={14} /></div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${shift.color.split(' ')[0].replace('100', '400')}`}></div>
+                        <span className="text-sm font-bold text-surface-700">{shift.label}</span>
+                        <span className="text-[10px] font-mono font-medium text-surface-400 bg-surface-50 px-1.5 py-0.5 rounded border border-surface-100 ml-auto mr-5">{workers.length} staff</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {workers.length > 0 ? workers.map(empId => {
+                          const emp = employees.find(e => e.id === empId);
+                          return <span key={empId} className={`text-[11px] font-bold px-2 py-1 rounded-md border ${shift.color} bg-opacity-40 whitespace-nowrap shadow-sm`}>{emp?.name}</span>;
+                        }) : <span className="text-[10px] text-surface-400 italic bg-surface-50 px-2 py-1 rounded-md border border-dashed border-surface-200">Unstaffed - Click to add</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderMonthlyGrid = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const emptySlots = Array.from({ length: firstDayOfMonth });
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+    return (
+      <div className="bg-white border border-surface-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full min-h-[600px]">
+        <div className="grid grid-cols-7 border-b border-surface-200 bg-surface-50/80 shrink-0">
+          {WEEKDAYS.map(d => <div key={d} className="py-3 text-center text-xs font-bold text-surface-500 uppercase tracking-widest">{d}</div>)}
+        </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-surface-50/30">
+          <div className="grid grid-cols-7 auto-rows-[minmax(160px,auto)]">
+            {emptySlots.map((_, i) => <div key={`empty-${i}`} className="bg-surface-50/30 border-b border-r border-surface-100 min-h-[160px]"></div>)}
+            {days.map(day => {
+              const dateObj = new Date(year, month, day);
+              const dateKey = getSafeDateKey(dateObj);
+              const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+              const daySchedule = schedule?.[dateKey] || {};
+              return (
+                <div key={day} className={`min-h-[160px] p-3 border-b border-r border-surface-100 flex flex-col bg-white hover:bg-surface-50/50 transition-colors ${isWeekend ? 'bg-orange-50/10' : ''}`}>
+                  <div className="flex justify-between items-start mb-2.5 px-1 shrink-0">
+                    <span className={`text-sm font-bold ${isWeekend ? 'text-orange-600' : 'text-surface-700'}`}>{day}</span>
+                    {isWeekend && <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1 shadow-sm"></span>}
+                  </div>
+                  <div className="flex-1 space-y-2 pr-1">
+                    {shifts.map(shift => {
+                      const workers = daySchedule[shift.id] || [];
+                      return (
+                        <div
+                          key={shift.id}
+                          onClick={() => openEditModal(dateKey, shift.id, workers)}
+                          className={`group cursor-pointer rounded-lg border ${shift.color} bg-opacity-20 p-2 shadow-sm hover:ring-2 ring-brand-400/30 transition-all relative`}
+                        >
+                          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-brand-600 bg-white/90 backdrop-blur rounded p-1 shadow-sm"><Edit2 size={12} /></div>
+                          <div className="flex justify-between items-center mb-1.5 pr-4">
+                            <span className="text-[10px] font-extrabold uppercase opacity-80 tracking-wider truncate">{shift.label}</span>
+                            <span className="text-[10px] bg-white/90 px-1.5 rounded font-bold shadow-sm">{workers.length}</span>
+                          </div>
+                          <div className="text-xs leading-tight text-surface-700 font-medium transition-all">
+                            {workers.length > 0 ? workers.map(eid => employees.find(e => e.id === eid)?.name).join(', ') : <span className="text-surface-400 italic">Empty</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full min-h-0 space-y-5 animate-in fade-in duration-300">
+      {generationError && (
+        <div className="shrink-0 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-700 shadow-sm">
+          <AlertCircle className="shrink-0 mt-0.5" size={20} />
+          <div>
+            <h3 className="font-bold text-base mb-0.5">Generation Paused</h3>
+            <p className="text-sm font-medium">{generationError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Control Bar */}
+      <div className="shrink-0 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-white p-4 rounded-2xl border border-surface-200 shadow-sm">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full xl:w-auto">
+          <div className="flex bg-surface-100 p-1 rounded-xl border border-surface-200/60 shadow-inner">
+            <button onClick={() => setViewMode('day')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${viewMode === 'day' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><List size={16} /> Daily</button>
+            <button onClick={() => setViewMode('week')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${viewMode === 'week' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><CalendarDays size={16} /> Weekly</button>
+            <button onClick={() => setViewMode('month')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${viewMode === 'month' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><Grid size={16} /> Monthly</button>
+          </div>
+          <div className="flex items-center bg-surface-50 border border-surface-200 rounded-xl p-1 shadow-sm">
+            <button onClick={() => navigateDate(-1)} className="p-1.5 hover:bg-white rounded-lg transition-colors"><ChevronLeft size={18} /></button>
+            <span className="w-56 text-center font-bold text-surface-700 text-sm">{getDisplayDateRange()}</span>
+            <button onClick={() => navigateDate(1)} className="p-1.5 hover:bg-white rounded-lg transition-colors"><ChevronRight size={18} /></button>
+          </div>
+        </div>
+        <div className="flex gap-3 w-full xl:w-auto">
+          <button onClick={handleGenerate} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-brand-600/20 active:scale-95 transition-all"><RefreshCw size={16} /> Auto-Generate</button>
+          <button onClick={downloadCSV} disabled={!schedule} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-surface-300 hover:bg-surface-50 text-surface-700 rounded-xl text-sm font-bold shadow-sm active:scale-95 transition-all disabled:opacity-50"><Download size={16} /> Export</button>
+        </div>
+      </div>
+
+      {/* Grid Area */}
+      {!schedule ? (
+        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-3xl border-2 border-surface-200 border-dashed animate-in fade-in min-h-0">
+          <Users className="text-surface-300 mb-4" size={56} />
+          <h3 className="text-xl font-extrabold text-surface-800 mb-1">No Active Schedule</h3>
+          <p className="text-surface-500 font-medium text-sm">Check your configuration and click Auto-Generate to build the roster.</p>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 flex flex-col animate-in fade-in duration-500">
+          {viewMode === 'day' && <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">{renderDailyView()}</div>}
+          {viewMode === 'week' && <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">{renderWeeklyView()}</div>}
+          {viewMode === 'month' && renderMonthlyGrid()}
+        </div>
+      )}
+
+      {/* Floating Edit Modal */}
+      <EditShiftModal
+        isOpen={editingShift !== null}
+        onClose={() => setEditingShift(null)}
+        dateKey={editingShift?.dateKey}
+        shift={shifts.find(s => s.id === editingShift?.shiftId)}
+        assignedIds={editingShift?.currentWorkers}
+        employees={employees}
+        onSave={handleSaveEdit}
+      />
+    </div>
+  );
+}

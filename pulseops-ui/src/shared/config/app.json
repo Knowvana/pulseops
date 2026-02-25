@@ -1,0 +1,41 @@
+{
+  "appName": "PulseOps",
+  "appVersion": "1.0.0",
+  "appDescription": "Enterprise Operations Management Platform",
+  "environment": "development",
+  "roles": {
+    "admin": {
+      "id": "admin",
+      "label": "Platform Admin",
+      "description": "Full platform access including settings, user management, and all modules"
+    },
+    "manager": {
+      "id": "manager",
+      "label": "Manager",
+      "description": "Access to assigned modules and reporting"
+    },
+    "user": {
+      "id": "user",
+      "label": "User",
+      "description": "Standard user access to assigned modules"
+    }
+  },
+  "modules": [
+    {
+      "id": "platform_admin",
+      "name": "Platform Admin",
+      "description": "System overview, user management, settings, and logs",
+      "icon": "Shield",
+      "roles": ["admin"],
+      "enabled": true
+    },
+    {
+      "id": "shift_roster",
+      "name": "Shift Roster Planner",
+      "description": "Workforce scheduling, shift allocation, and compliance reporting",
+      "icon": "Calendar",
+      "roles": ["admin", "manager", "user"],
+      "enabled": true
+    }
+  ]
+}

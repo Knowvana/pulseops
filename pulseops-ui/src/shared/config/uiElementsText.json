@@ -1,0 +1,391 @@
+{
+  "topNav": {
+    "brand": {
+      "appName": "PulseOps",
+      "subtitle": "Enterprise"
+    },
+    "buttons": {
+      "systemAdmin": "System Admin",
+      "settings": "Global Settings",
+      "signOut": "Sign Out",
+      "monitor": "Monitor"
+    },
+    "userMenu": {
+      "roleLabel": "Role",
+      "signOutLabel": "Sign Out"
+    }
+  },
+  "sideNav": {
+    "header": {
+      "collapseLabel": "Collapse",
+      "expandTooltip": "Expand sidebar",
+      "collapseTooltip": "Collapse sidebar"
+    }
+  },
+  "rightPanel": {
+    "tabs": {
+      "systemLogs": "System Logs",
+      "apiCalls": "API Calls",
+      "reportIssue": "Report Issue"
+    },
+    "logs": {
+      "filterAll": "all",
+      "filterDebug": "debug",
+      "filterInfo": "info",
+      "filterWarn": "warn",
+      "filterError": "error",
+      "clearTooltip": "Clear logs",
+      "emptyMessage": "No logs yet"
+    },
+    "api": {
+      "callsLabel": "calls",
+      "clearTooltip": "Clear API logs",
+      "emptyMessage": "No API calls yet"
+    },
+    "report": {
+      "title": "Report an Issue",
+      "description": "Describe the issue you encountered. Recent logs will be automatically attached.",
+      "issueTitleLabel": "Issue Title",
+      "issueTitlePlaceholder": "Brief description of the issue",
+      "categoryLabel": "Category",
+      "categories": ["Bug Report", "Feature Request", "Performance Issue", "Access / Permissions", "Other"],
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Steps to reproduce, expected vs actual behavior...",
+      "attachLogsLabel": "Attach recent system logs",
+      "submitButton": "Submit Report",
+      "footerNote": "Reports are sent to the platform administrator for review."
+    }
+  },
+  "login": {
+    "title": "Welcome Back",
+    "subtitle": "Sign in to your account",
+    "emailLabel": "Email Address",
+    "emailPlaceholder": "admin@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "submitButton": "Sign In",
+    "loadingButton": "Signing in...",
+    "forgotPassword": "Forgot password?",
+    "poweredBy": "Powered by PulseOps"
+  },
+  "platformAdmin": {
+    "sideNav": {
+      "title": "Platform Admin",
+      "subtitle": "System Management"
+    },
+    "navItems": {
+      "overview": "Overview",
+      "users": "Users",
+      "modules": "Modules",
+      "logs": "Logs",
+      "settings": "Settings"
+    },
+    "overview": {
+      "pageTitle": "Platform Admin - Overview",
+      "welcome": "Welcome, {name}",
+      "tiles": {
+        "systemHealth": {
+          "label": "System Health",
+          "operational": "Operational",
+          "degraded": "Degraded",
+          "checking": "Checking...",
+          "allServicesRunning": "All services running",
+          "connectingToDb": "Connecting to database...",
+          "cannotReachDb": "Cannot reach database"
+        },
+        "modules": {
+          "label": "Modules",
+          "detail": "Available platform modules"
+        },
+        "users": {
+          "label": "System Users",
+          "manage": "Manage"
+        },
+        "logs": {
+          "label": "System Logs",
+          "viewAll": "View All"
+        }
+      },
+      "databaseObjects": {
+        "title": "Database Summary",
+        "connected": "CONNECTED",
+        "checking": "CHECKING",
+        "refresh": "Refresh",
+        "sections": {
+          "coreObjects": "Core Objects",
+          "users": "Users",
+          "logs": "Logs",
+          "apiStats": "API Stats"
+        },
+        "fields": {
+          "databaseType": "Database Type",
+          "provider": "PostgreSQL",
+          "tables": "Tables",
+          "totalUsers": "Total Users",
+          "activeUsers": "Active Users",
+          "inactiveUsers": "Inactive Users",
+          "totalLogEntries": "Total Log Entries",
+          "errors": "Errors",
+          "warnings": "Warnings",
+          "inMemoryLogs": "In-Memory Logs",
+          "totalApiCalls": "Total API Calls",
+          "successCount": "Success Count",
+          "failureCount": "Failure Count",
+          "avgResponseTime": "Avg Response Time"
+        }
+      },
+      "recentActivity": {
+        "title": "Recent Activity",
+        "entriesLabel": "entries",
+        "searchPlaceholder": "Search activity...",
+        "emptyMessage": "No activity found."
+      },
+      "platformInfo": {
+        "title": "Platform Information",
+        "fields": {
+          "platform": "Platform",
+          "version": "Version",
+          "environment": "Environment",
+          "framework": "Framework",
+          "uiLibrary": "UI Library",
+          "backend": "Backend",
+          "totalModules": "Total Modules",
+          "database": "Database",
+          "apiUrl": "API URL",
+          "loggedInAs": "Logged In As",
+          "role": "Role",
+          "apiHealth": "API Health"
+        },
+        "values": {
+          "framework": "React 18 + Vite 5",
+          "uiLibrary": "Tailwind CSS 3",
+          "backend": "Express + Sequelize ORM",
+          "database": "PostgreSQL 16",
+          "environment": "Development"
+        }
+      }
+    },
+    "logs": {
+      "pageTitle": "Platform Admin - Logs",
+      "tabs": {
+        "systemLogs": "System Logs",
+        "apiLogs": "API Logs"
+      },
+      "stats": {
+        "inDatabase": "In Database",
+        "inAppCache": "In App Cache",
+        "autoRefresh": "Auto refresh",
+        "every": "every",
+        "autoFlushAt": "Auto-flush at"
+      },
+      "toolbar": {
+        "searchSystem": "Search logs...",
+        "searchApi": "Search API calls...",
+        "allSources": "All Sources",
+        "refresh": "Refresh",
+        "flush": "Flush",
+        "flushing": "Flushing...",
+        "logSettings": "Log Settings",
+        "clearTooltip": "Clear logs",
+        "autoRefreshOn": "Auto-refresh ON",
+        "autoRefreshOff": "Auto-refresh OFF"
+      },
+      "columns": {
+        "level": "Level",
+        "time": "Time",
+        "component": "Component",
+        "event": "Event",
+        "user": "User",
+        "message": "Message",
+        "result": "Result",
+        "method": "Method",
+        "apiUrl": "API URL",
+        "status": "Status",
+        "responseTime": "Response Time",
+        "requestBody": "Request Body",
+        "responseBody": "Response Body",
+        "timestamp": "Timestamp"
+      },
+      "detail": {
+        "title": "Log Detail",
+        "noSelection": "Select a log entry to view details",
+        "fields": {
+          "level": "Level",
+          "timestamp": "Timestamp",
+          "source": "Source",
+          "component": "Component",
+          "user": "User",
+          "message": "Message",
+          "result": "Result",
+          "data": "Data",
+          "method": "Method",
+          "url": "URL",
+          "statusCode": "Status Code",
+          "responseTime": "Response Time",
+          "requestBody": "Request Body",
+          "responseBody": "Response Body"
+        }
+      },
+      "empty": {
+        "system": "No logs match your filters",
+        "api": "No API calls match your filters"
+      }
+    },
+    "settings": {
+      "pageTitle": "Platform Admin - Settings",
+      "subtitle": "Global configuration — App Admin only",
+      "tabs": {
+        "database": "Database Configuration",
+        "dbObjects": "Database Objects",
+        "authentication": "Authentication",
+        "logging": "Logging"
+      },
+      "database": {
+        "title": "Database Connection",
+        "description": "Configure the PostgreSQL database connection for the platform.",
+        "connectionStatus": "Connection Details",
+        "fields": {
+          "host": "Host",
+          "port": "Port",
+          "database": "Database Name",
+          "username": "Username",
+          "password": "Password",
+          "ssl": "SSL Connection"
+        },
+        "placeholders": {
+          "host": "localhost",
+          "port": "5432",
+          "database": "pulseops",
+          "username": "postgres",
+          "password": "Enter password"
+        },
+        "buttons": {
+          "testConnect": "Test Connect",
+          "testing": "Testing...",
+          "saveConfig": "Save Configuration",
+          "saving": "Saving..."
+        },
+        "status": {
+          "connected": "Connected",
+          "notConnected": "Not Connected",
+          "testing": "Testing connection..."
+        },
+        "typeLabel": "PostgreSQL Database",
+        "typeDescription": "Enterprise backend with Sequelize ORM, JWT auth, and rate limiting"
+      },
+      "dbObjects": {
+        "title": "Database Objects Management",
+        "description": "Manage database schema and seed data.",
+        "schemaStatus": "Database Schema",
+        "schemaInitialized": "Initialized",
+        "schemaNotInitialized": "Not Initialized",
+        "schemaDescription": "Create all required database tables.",
+        "initializeSchema": "Initialize Database",
+        "initializing": "Initializing...",
+        "schemaReady": "Database schema initialized and ready",
+        "defaultData": "Default Data",
+        "defaultDataLoaded": "Loaded",
+        "defaultDataNotLoaded": "Not Loaded",
+        "defaultDataDescription": "Load default admin user and system configuration.",
+        "loadDefaultData": "Load Default Data",
+        "loading": "Loading...",
+        "defaultDataReady": "Default data loaded",
+        "demoData": "Demo Data",
+        "demoDataDescription": "Load or delete sample data for testing.",
+        "loadDemoData": "Load Demo Data",
+        "deleteDemoData": "Delete Demo Data",
+        "wipeDatabase": "Wipe All Data",
+        "wipeTitle": "Danger Zone",
+        "wipeDescription": "Delete all data from all tables. This action cannot be undone."
+      },
+      "authentication": {
+        "title": "Authentication Configuration",
+        "description": "Configure how users authenticate with the platform.",
+        "currentMethod": "Current Authentication Method",
+        "methods": {
+          "json": "JSON File Authentication",
+          "database": "Database Authentication"
+        },
+        "jsonDescription": "Users are authenticated against the local defaultUsers.json file. This is the default method until the database is configured and initialized.",
+        "databaseDescription": "Users are authenticated against the PostgreSQL users table with bcrypt password hashing.",
+        "switchLabel": "Authentication Provider",
+        "dbNotReady": "Database must be configured and initialized before switching to database authentication.",
+        "switchButton": "Switch to Database Auth",
+        "switchingButton": "Switching...",
+        "currentBadge": "Active"
+      },
+      "logging": {
+        "title": "Logging Configuration",
+        "description": "Control what gets logged across the platform.",
+        "logLevel": {
+          "title": "Log Level",
+          "description": "Only logs at or above this level will be captured."
+        },
+        "captureOptions": {
+          "title": "Capture Options",
+          "consoleOutput": "Console Output",
+          "consoleDescription": "Mirror logs to the browser developer console",
+          "apiLogs": "API Logs",
+          "apiDescription": "Track all backend API requests and responses",
+          "uiLogs": "UI Logs",
+          "uiDescription": "Capture UI interaction and navigation events",
+          "moduleLogs": "Module Logs",
+          "moduleDescription": "Enable logging for specific modules"
+        },
+        "retention": {
+          "title": "Log Retention",
+          "maxEntries": "Max In-Memory Entries",
+          "maxEntriesDescription": "Oldest entries are discarded when the buffer is full.",
+          "dbRetention": "Database Retention (entries)",
+          "dbRetentionDescription": "Maximum log entries to retain in database. Older entries will be auto-cleaned.",
+          "autoCleanup": "Auto Cleanup",
+          "autoCleanupDescription": "Automatically delete oldest entries when retention limit is reached."
+        },
+        "modulewise": {
+          "title": "Module-wise Logging",
+          "description": "Enable or disable logging per module."
+        },
+        "saveButton": "Save Configuration",
+        "savedButton": "Saved!",
+        "saveNote": "Changes take effect immediately."
+      }
+    }
+  },
+  "shiftRoster": {
+    "sideNav": {
+      "title": "Shift Roster",
+      "subtitle": "Workforce Planning"
+    },
+    "navItems": {
+      "dashboard": "Dashboard",
+      "config": "Configuration",
+      "reports": "Reports",
+      "settings": "Settings"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "saved": "Saved!",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "save": "Save",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "search": "Search",
+    "filter": "Filter",
+    "noData": "No data available",
+    "yes": "Yes",
+    "no": "No",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "active": "Active",
+    "inactive": "Inactive"
+  }
+}

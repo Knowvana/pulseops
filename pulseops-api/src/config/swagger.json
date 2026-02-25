@@ -1,0 +1,24 @@
+{
+  "definition": {
+    "openapi": "3.0.0",
+    "info": {
+      "title": "PulseOps API",
+      "version": "1.0.0",
+      "description": "Enterprise Operations Management API — Standalone Kubernetes-ready backend with Sequelize ORM and PostgreSQL."
+    },
+    "servers": [
+      { "url": "http://localhost:4000/api", "description": "Development" }
+    ],
+    "components": {
+      "securitySchemes": {
+        "BearerAuth": {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT"
+        }
+      }
+    },
+    "security": [{ "BearerAuth": [] }]
+  },
+  "apis": ["src/core/routes/*.js", "src/modules/*/routes/*.js"]
+}

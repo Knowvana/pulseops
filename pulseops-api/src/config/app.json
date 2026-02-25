@@ -1,0 +1,27 @@
+{
+  "appName": "PulseOps API",
+  "appVersion": "1.0.0",
+  "environment": "development",
+  "port": 4000,
+  "apiPrefix": "/api",
+  "jwt": {
+    "secret": "pulseops-jwt-secret-change-in-production",
+    "expiresIn": "24h",
+    "refreshExpiresIn": "7d"
+  },
+  "cors": {
+    "origin": ["http://localhost:3000"],
+    "credentials": true
+  },
+  "rateLimit": {
+    "windowMs": 900000,
+    "max": 200,
+    "message": "Too many requests, please try again later."
+  },
+  "defaultAdmin": {
+    "email": "admin@pulseops.local",
+    "password": "admin123",
+    "name": "Platform Admin",
+    "role": "admin"
+  }
+}

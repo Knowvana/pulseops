@@ -1,0 +1,9 @@
+{
+  "apiBaseUrl": "http://localhost:4000/api",
+  "healthEndpoint": "http://localhost:4000/api/health",
+  "authEndpoint": "http://localhost:4000/api/auth",
+  "usersEndpoint": "http://localhost:4000/api/users",
+  "configEndpoint": "http://localhost:4000/api/config",
+  "databaseEndpoint": "http://localhost:4000/api/database",
+  "rosterEndpoint": "http://localhost:4000/api/roster"
+}

@@ -1,0 +1,18 @@
+{
+  "provider": "PostgreSQL",
+  "host": "postgres",
+  "port": 5432,
+  "database": "postgres",
+  "username": "postgres",
+  "password": "Infosys@123",
+  "schema": "public",
+  "dialect": "postgres",
+  "pool": {
+    "min": 2,
+    "max": 10,
+    "acquire": 30000,
+    "idle": 10000
+  },
+  "logging": false,
+  "ssl": false
+}

@@ -1,0 +1,12 @@
+{
+  "users": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "Platform Admin",
+      "email": "Admin@123",
+      "password": "Password@123",
+      "role": "admin",
+      "status": "active"
+    }
+  ]
+}

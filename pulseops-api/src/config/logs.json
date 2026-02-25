@@ -1,0 +1,64 @@
+{
+  "messages": {
+    "server": {
+      "starting": "Server starting on port {port}",
+      "started": "Server started successfully on port {port}",
+      "shutdownSignal": "Received {signal}, starting graceful shutdown",
+      "shutdownComplete": "Graceful shutdown complete",
+      "shutdownError": "Error during shutdown"
+    },
+    "database": {
+      "connecting": "Connecting to PostgreSQL database",
+      "connected": "Database connection established",
+      "connectionFailed": "Database connection failed",
+      "syncing": "Synchronizing database models",
+      "synced": "Database models synchronized",
+      "syncFailed": "Database sync failed",
+      "schemaCreated": "Database schema created successfully",
+      "schemaExists": "Database schema already exists",
+      "seedingDefault": "Seeding default data",
+      "seedingDemo": "Seeding demo data",
+      "seedComplete": "Data seeding complete",
+      "wipeStarted": "Database wipe initiated",
+      "wipeComplete": "Database wipe complete",
+      "healthOk": "Database health check passed",
+      "healthFail": "Database health check failed"
+    },
+    "auth": {
+      "loginAttempt": "Login attempt for {email}",
+      "loginSuccess": "Login successful for {email}",
+      "loginFailed": "Login failed for {email}",
+      "tokenGenerated": "JWT token generated for user {userId}",
+      "tokenInvalid": "Invalid or expired token",
+      "tokenMissing": "No authorization token provided",
+      "unauthorized": "Unauthorized access attempt",
+      "forbidden": "Forbidden — insufficient role"
+    },
+    "user": {
+      "created": "User created: {email}",
+      "updated": "User updated: {userId}",
+      "deleted": "User deleted: {userId}",
+      "notFound": "User not found: {identifier}",
+      "listFetched": "User list fetched ({count} users)"
+    },
+    "roster": {
+      "scheduleSaved": "Roster schedule saved for {month}/{year}",
+      "scheduleLoaded": "Roster schedule loaded for {month}/{year}",
+      "scheduleDeleted": "Roster schedule deleted for {month}/{year}",
+      "configSaved": "Roster configuration saved",
+      "configLoaded": "Roster configuration loaded"
+    },
+    "middleware": {
+      "rateLimitHit": "Rate limit exceeded for IP {ip}",
+      "corsBlocked": "CORS blocked request from {origin}",
+      "requestReceived": "{method} {url} — {statusCode} ({latencyMs}ms)"
+    }
+  },
+  "config": {
+    "level": "info",
+    "format": "json",
+    "transports": ["console"],
+    "maxFiles": 5,
+    "maxSize": "10m"
+  }
+}

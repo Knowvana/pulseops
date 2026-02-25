@@ -1,0 +1,36 @@
+/* ============================================================================
+   Global Styles — PulseOps UI
+   
+   PURPOSE: Base Tailwind directives + custom utility classes shared across
+   all components. Defines scrollbar styling, animation utilities, and
+   global resets.
+   ============================================================================ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface-50 text-surface-800 font-sans;
+  }
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-surface-300 rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-400;
+  }
+
+  .animate-in {
+    animation: animateIn 0.3s ease-out;
+  }
+}

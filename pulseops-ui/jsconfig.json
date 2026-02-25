@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@shared": ["src/shared"],
+      "@config/*": ["src/shared/config/*"],
+      "@config": ["src/shared/config"],
+      "@modules/*": ["src/modules/*"],
+      "@modules": ["src/modules"],
+      "@core/*": ["src/core/*"],
+      "@core": ["src/core"]
+    }
+  },
+  "include": ["src/**/*"]
+}

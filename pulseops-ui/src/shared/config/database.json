@@ -1,0 +1,11 @@
+{
+  "provider": "PostgreSQL",
+  "host": "localhost",
+  "port": 5432,
+  "database": "pulseops",
+  "schema": "public",
+  "sslMode": "prefer",
+  "poolMin": 2,
+  "poolMax": 10,
+  "connectionTimeoutMs": 5000
+}

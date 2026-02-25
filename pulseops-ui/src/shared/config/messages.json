@@ -1,0 +1,52 @@
+{
+  "errors": {
+    "networkError": "Unable to reach the server. Please check your connection.",
+    "unauthorized": "Your session has expired. Please sign in again.",
+    "forbidden": "You do not have permission to perform this action.",
+    "serverError": "An unexpected server error occurred. Please try again.",
+    "notFound": "The requested resource was not found.",
+    "validationError": "Please check the form fields and try again.",
+    "duplicateEmail": "A user with this email already exists.",
+    "passwordMismatch": "Passwords do not match.",
+    "weakPassword": "Password must be at least 8 characters.",
+    "dbConnectionFailed": "Database connection failed. Check your connection settings.",
+    "dbInitFailed": "Database initialization failed. Check server logs.",
+    "configSaveFailed": "Failed to save configuration. Please try again.",
+    "authSwitchFailed": "Failed to switch authentication method.",
+    "schemaInitFailed": "Schema initialization failed."
+  },
+  "success": {
+    "loginSuccess": "Signed in successfully.",
+    "logoutSuccess": "Signed out successfully.",
+    "configSaved": "Configuration saved successfully.",
+    "dbConnected": "Database connection successful.",
+    "dbInitialized": "Database initialized successfully.",
+    "schemaCreated": "Database schema created successfully.",
+    "defaultDataLoaded": "Default data loaded successfully.",
+    "demoDataLoaded": "Demo data loaded successfully.",
+    "demoDataDeleted": "Demo data deleted successfully.",
+    "dbWiped": "All data wiped successfully.",
+    "userCreated": "User created successfully.",
+    "userUpdated": "User updated successfully.",
+    "userDeleted": "User deleted successfully.",
+    "authSwitched": "Authentication method changed successfully.",
+    "logConfigSaved": "Logging configuration saved successfully."
+  },
+  "confirm": {
+    "loadDemoData": "This will add sample employees and shifts to your roster. Is that okay?",
+    "deleteAllRoster": "Warning: This action cannot be undone. All roster data will be permanently erased.",
+    "wipeDatabase": "This will delete all documents from all tables but keep the table structure intact. This action cannot be undone.",
+    "initializeDb": "This will create the necessary database tables and seed default data. Continue?",
+    "deleteUser": "Are you sure you want to delete this user? This action cannot be undone.",
+    "switchAuthToDb": "This will switch authentication from JSON file to database. Ensure the database is initialized with at least one admin user. Continue?",
+    "deleteDemoData": "This will remove all demo/sample data. Continue?"
+  },
+  "info": {
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "dbNotConfigured": "Database is not configured. Using JSON file authentication.",
+    "dbNotInitialized": "Database tables have not been created yet.",
+    "noLogsYet": "No log entries recorded yet.",
+    "configUpdateNote": "Changes take effect immediately.",
+    "passwordNotShown": "Password is not displayed for security reasons."
+  }
+}

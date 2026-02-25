@@ -1,0 +1,69 @@
+{
+  "messages": {
+    "auth": {
+      "loginSuccess": "User logged in successfully",
+      "loginFailed": "Login failed: Invalid credentials",
+      "logoutSuccess": "User logged out successfully",
+      "sessionExpired": "Session expired, please login again",
+      "unauthorized": "Unauthorized access attempt"
+    },
+    "api": {
+      "requestStarted": "API request started",
+      "requestCompleted": "API request completed",
+      "requestFailed": "API request failed",
+      "networkError": "Network error — unable to reach server",
+      "timeout": "Request timed out"
+    },
+    "database": {
+      "connectionSuccess": "Database connection successful",
+      "connectionFailed": "Database connection failed",
+      "schemaCreated": "Database schema created successfully",
+      "schemaExists": "Database schema already exists",
+      "dataLoaded": "Default data loaded successfully",
+      "demoDataLoaded": "Demo data loaded successfully",
+      "dataWiped": "All data wiped successfully",
+      "testPassed": "Connection test passed",
+      "testFailed": "Connection test failed"
+    },
+    "platform": {
+      "statsLoaded": "Platform stats loaded",
+      "statsLoadFailed": "Failed to load platform stats",
+      "configSaved": "Configuration saved successfully",
+      "configSaveFailed": "Failed to save configuration",
+      "refreshStarted": "Refreshing dashboard data",
+      "refreshComplete": "Dashboard data refreshed"
+    },
+    "roster": {
+      "generated": "Roster schedule generated",
+      "generationFailed": "Roster generation failed — capacity issue",
+      "demoLoaded": "Roster demo data loaded",
+      "dataCleared": "Roster data cleared",
+      "shiftEdited": "Shift assignment updated",
+      "employeeAdded": "Employee added to resource pool",
+      "employeeRemoved": "Employee removed from resource pool"
+    },
+    "user": {
+      "created": "User created successfully",
+      "updated": "User updated successfully",
+      "deleted": "User deleted successfully",
+      "statsLoaded": "User stats loaded"
+    },
+    "common": {
+      "loading": "Loading...",
+      "saving": "Saving...",
+      "refreshing": "Refreshing...",
+      "processing": "Processing your request...",
+      "actionComplete": "Action completed successfully",
+      "actionFailed": "Action failed",
+      "confirmDelete": "Are you sure? This action cannot be undone.",
+      "noData": "No data available"
+    }
+  },
+  "config": {
+    "minLevel": "info",
+    "maxBufferSize": 500,
+    "enableConsole": true,
+    "enableRemote": true,
+    "remoteFlushIntervalMs": 30000
+  }
+}
