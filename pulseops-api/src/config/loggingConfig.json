@@ -1,7 +1,7 @@
 {
   "logLevel": "info",
   "consoleOutput": true,
-  "captureApiCalls": true,
+  "captureApiCalls": false,
   "captureUiLogs": true,
   "captureModuleLogs": true,
   "maxEntries": 600,
@@ -12,5 +12,5 @@
     "platform_admin": true,
     "shift_roster": true
   },
-  "updatedAt": "2026-02-25T17:05:23.920Z"
+  "updatedAt": "2026-02-26T07:50:31.239Z"
 }

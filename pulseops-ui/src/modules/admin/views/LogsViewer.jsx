@@ -13,6 +13,8 @@ import uiText from '@shared/config/uiElementsText.json';
 
 const txt = uiText.platformAdmin.logs;
 
+const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
+
 const LEVEL_CONFIG = {
   debug: { color: 'text-surface-400', bg: 'bg-surface-100', label: 'DEBUG' },
   info:  { color: 'text-blue-600',    bg: 'bg-blue-50',     label: 'INFO' },
@@ -34,23 +36,41 @@ const SYSTEM_COLUMNS = [
   { id: 'event',     label: txt.columns.event,     width: 150 },
   { id: 'component', label: txt.columns.component, width: 120 },
   { id: 'user',      label: txt.columns.user,      width: 100 },
-  { id: 'message',   label: txt.columns.message,   width: 0 },
+  { id: 'message',   label: txt.columns.message,   width: 250 },
   { id: 'result',    label: txt.columns.result,    width: 75 },
   { id: 'synced',    label: txt.columns.synced,    width: 60 },
 ];
 
 const API_COLUMNS = [
-  { id: 'method',    label: txt.columns.method,       width: 75 },
-  { id: 'url',       label: txt.columns.apiUrl,       width: 0 },
-  { id: 'status',    label: txt.columns.status,       width: 70 },
-  { id: 'respTime',  label: txt.columns.responseTime, width: 95 },
-  { id: 'timestamp', label: txt.columns.timestamp,    width: 95 },
-  { id: 'result',    label: txt.columns.result,       width: 65 },
-  { id: 'synced',    label: txt.columns.synced,       width: 60 },
+  { id: 'time', label: txt.columns.time, width: 95 },
+  { id: 'method', label: txt.columns.method, width: 75 },
+  { id: 'url', label: txt.columns.apiUrl, width: 0 },
+  { id: 'status', label: txt.columns.status, width: 70 },
+  { id: 'respTime', label: txt.columns.responseTime, width: 95 },
+  { id: 'result', label: txt.columns.result, width: 65 },
+  { id: 'synced', label: txt.columns.synced, width: 60 },
 ];
 
 // Database logs use same columns as API logs
 const DB_LOGS_COLUMNS = API_COLUMNS;
+
+const SCROLLBAR_CSS = `
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: linear-gradient(to bottom, #e0f2fe, #b3e5fc);
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #4fc3f7, #29b6f6);
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #29b6f6, #0277bd);
+  }
+`;
 
 function getSortValue(log, colId, tab) {
   if (tab === 'system') {
@@ -68,11 +88,11 @@ function getSortValue(log, colId, tab) {
     }
   } else {
     switch (colId) {
+      case 'time': return log.timestamp || '';
       case 'method': return log.method || '';
       case 'url': return log.url || '';
       case 'status': return log.statusCode || 0;
       case 'respTime': return log.durationMs || 0;
-      case 'timestamp': return log.timestamp || '';
       case 'result': return log.success ? 1 : 0;
       case 'synced': return log.synced ? 1 : 0;
       default: return '';
@@ -80,7 +100,6 @@ function getSortValue(log, colId, tab) {
   }
 }
 
-const PAGE_SIZE = 500;
 
 export default function LogsViewer() {
   const [activeTab, setActiveTab] = useState('system');
@@ -94,6 +113,7 @@ export default function LogsViewer() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [visibleColumns, setVisibleColumns] = useState(null);
+  const [pageSize, setPageSize] = useState(500);
 
   const syncFromMemory = useCallback(() => {
     setLogs([...Logger.getSystemLogs()]);
@@ -136,10 +156,11 @@ export default function LogsViewer() {
   }, [syncFromMemory]);
 
   useEffect(() => {
-    if (activeTab === 'database') {
-      loadDatabaseLogs();
-    }
-  }, [activeTab, loadDatabaseLogs]);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   const filteredLogs = useMemo(() => {
     const source = activeTab === 'system' ? logs : activeTab === 'api' ? apiLogs : dbLogs;
@@ -166,12 +187,11 @@ export default function LogsViewer() {
     return filtered;
   }, [logs, apiLogs, dbLogs, activeTab, levelFilter, searchText, sortConfig]);
 
-  const totalPages = Math.ceil(filteredLogs.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filteredLogs.length / pageSize);
   const paginatedLogs = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    const end = start + PAGE_SIZE;
-    return filteredLogs.slice(start, end);
-  }, [filteredLogs, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage, pageSize]);
 
   const handleClear = useCallback(() => {
     if (activeTab === 'system') Logger.clearSystemLogs();
@@ -186,6 +206,8 @@ export default function LogsViewer() {
     }));
   }, []);
 
+  const handlePageSizeChange = useCallback((e) => setPageSize(Number(e.target.value)), []);
+
   const colDefs = activeTab === 'system' ? SYSTEM_COLUMNS : API_COLUMNS;
 
   const renderSystemCell = (log, colId) => {
@@ -194,8 +216,29 @@ export default function LogsViewer() {
         const lc = LEVEL_CONFIG[log.level] || LEVEL_CONFIG.info;
         return <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-bold ${lc.bg} ${lc.color}`}>{lc.label}</span>;
       }
-      case 'time':
-        return <span className="font-mono text-surface-400 text-xs whitespace-nowrap">{log.timestamp ? new Date(log.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) + ' ' + new Date(log.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</span>;
+      case 'time': {
+        if (!log.timestamp) return <span className="font-mono text-surface-400 text-xs whitespace-nowrap">—</span>;
+        const options = {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        };
+        const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(new Date(log.timestamp));
+        const day = parts.find(p => p.type === 'day').value;
+        const month = parts.find(p => p.type === 'month').value;
+        const year = parts.find(p => p.type === 'year').value;
+        const hour = parts.find(p => p.type === 'hour').value;
+        const minute = parts.find(p => p.type === 'minute').value;
+        const second = parts.find(p => p.type === 'second').value;
+        const dayPeriod = parts.find(p => p.type === 'dayPeriod').value;
+        const formattedTime = `${day}.${month}.${year} ${hour}:${minute}:${second} ${dayPeriod}`;
+        return <span className="font-mono text-surface-400 text-xs whitespace-nowrap">{formattedTime}</span>;
+      }
       case 'source': {
         const sourceColors = {
           'UI': 'bg-blue-50 text-blue-600',
@@ -228,6 +271,28 @@ export default function LogsViewer() {
 
   const renderApiCell = (log, colId) => {
     switch (colId) {
+      case 'time':
+        if (!log.timestamp) return <span className="font-mono text-surface-400 text-xs whitespace-nowrap">—</span>;
+        const options = {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        };
+        const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(new Date(log.timestamp));
+        const day = parts.find(p => p.type === 'day').value;
+        const month = parts.find(p => p.type === 'month').value;
+        const year = parts.find(p => p.type === 'year').value;
+        const hour = parts.find(p => p.type === 'hour').value;
+        const minute = parts.find(p => p.type === 'minute').value;
+        const second = parts.find(p => p.type === 'second').value;
+        const dayPeriod = parts.find(p => p.type === 'dayPeriod').value;
+        const formattedTime = `${day}.${month}.${year} ${hour}:${minute}:${second} ${dayPeriod}`;
+        return <span className="font-mono text-surface-400 text-xs whitespace-nowrap">{formattedTime}</span>;
       case 'method':
         return (
           <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-bold ${
@@ -262,8 +327,6 @@ export default function LogsViewer() {
             {JSON.stringify(log.responsePayload).substring(0, 30)}...
           </span>
         ) : <span className="text-surface-400 text-xs">—</span>;
-      case 'timestamp':
-        return <span className="font-mono text-surface-400 text-xs">{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '—'}</span>;
       case 'synced':
         return log.synced
           ? <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Yes</span>
@@ -309,7 +372,7 @@ export default function LogsViewer() {
         ];
 
     return (
-      <div className="p-4 space-y-3 overflow-y-auto">
+      <div className="p-4 space-y-3">
         <div className="flex items-center justify-between sticky top-0 bg-white z-10">
           <h4 className="text-sm font-bold text-surface-700">{txt.detail.title}</h4>
           <button onClick={() => setSelectedLog(null)} className="p-1 rounded text-surface-400 hover:text-surface-600">
@@ -331,7 +394,7 @@ export default function LogsViewer() {
         {isApi && selectedLog.requestPayload && (
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.requestBody}</p>
-            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words">
+            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar whitespace-pre-wrap break-words">
               {formatSanitizedJson(selectedLog.requestPayload)}
             </pre>
           </div>
@@ -339,7 +402,7 @@ export default function LogsViewer() {
         {isApi && selectedLog.responsePayload && (
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.responseBody}</p>
-            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words">
+            <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar whitespace-pre-wrap break-words">
               {formatSanitizedJson(selectedLog.responsePayload)}
             </pre>
           </div>
@@ -358,6 +421,9 @@ export default function LogsViewer() {
 
   return (
     <div className="animate-fade-in h-screen flex flex-col overflow-hidden">
+      <style dangerouslySetInnerHTML={{
+        __html: SCROLLBAR_CSS
+      }} />
       <div className="flex-shrink-0">
         <PageHeader title={txt.pageTitle} subtitle={`${filteredLogs.length} entries displayed`} icon={ScrollText} />
       </div>
@@ -460,30 +526,6 @@ export default function LogsViewer() {
           )}
 
           <div className="flex items-center gap-2 ml-auto">
-            {/* Pagination Controls */}
-            {filteredLogs.length > 0 && (
-              <div className="flex items-center gap-2 border-l border-surface-200 pl-3">
-                <span className="text-xs text-surface-500">
-                  Page {currentPage} of {totalPages} ({filteredLogs.length} total)
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="p-1.5 rounded text-surface-400 hover:text-brand-600 hover:bg-brand-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="p-1.5 rounded text-surface-400 hover:text-brand-600 hover:bg-brand-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              </div>
-            )}
             <button onClick={handleClear} className="p-2 rounded-lg text-surface-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title={txt.toolbar.clearTooltip}>
               <Trash2 size={14} />
             </button>
@@ -492,7 +534,7 @@ export default function LogsViewer() {
       </Card>
 
       {/* Table + Detail Panel */}
-      <div className="flex-1 flex gap-3 min-h-0">
+      <div className="flex gap-3 min-h-0 overflow-hidden max-h-[calc(100vh-300px)]">
           <div className="flex-1 min-w-0 overflow-hidden border border-surface-200 rounded-lg bg-white flex flex-col">
             {filteredLogs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-surface-300 flex-1">
@@ -507,7 +549,7 @@ export default function LogsViewer() {
               </div>
             ) : (
               <>
-                <div className="flex-1 overflow-x-auto overflow-y-auto">
+                <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
                   <table className="w-full text-sm border-collapse">
                     <thead className="sticky top-0 bg-surface-50 z-10">
                       <tr className="border-b border-surface-200">
@@ -550,6 +592,13 @@ export default function LogsViewer() {
                           </tr>
                         );
                       })}
+                      {Array.from({ length: pageSize - paginatedLogs.length }, (_, i) => (
+                        <tr key={`empty-${i}`} className="border-b border-surface-50">
+                          {colDefs.map((col) => (
+                            <td key={col.id} className="px-3 py-2 text-xs">&nbsp;</td>
+                          ))}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -559,11 +608,39 @@ export default function LogsViewer() {
 
           {/* Right Detail Panel */}
           {selectedLog && (
-            <div className="w-[420px] flex-shrink-0 border border-surface-200 rounded-lg bg-white overflow-hidden flex flex-col">
+            <div className="w-[320px] flex-shrink-0 border border-surface-200 rounded-lg bg-white overflow-hidden flex flex-col">
               {renderDetailPanel()}
             </div>
           )}
       </div>
+
+      {/* Pagination */}
+      {filteredLogs.length > 0 && (
+        <Card variant="flat" className="flex-shrink-0 border-t border-surface-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 shadow-sm">
+          <div className="p-4 flex items-center justify-center gap-6">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-surface-500">Page {currentPage} of {totalPages} ({filteredLogs.length} total)</span>
+            <select value={pageSize} onChange={handlePageSizeChange} className="px-3 py-2 border border-surface-300 rounded-md text-[10px] bg-white shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400 transition-all duration-200 ease-in-out">
+              {PAGE_SIZE_OPTIONS.map(option => (<option key={option} value={option}>{option}</option>))}
+            </select>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2.5 rounded-lg bg-white border border-surface-300 text-surface-600 hover:bg-brand-50 hover:border-brand-400 hover:text-brand-700 hover:shadow-md disabled:bg-surface-100 disabled:text-surface-400 disabled:border-surface-200 disabled:cursor-not-allowed transition-all duration-200 ease-in-out shadow-sm"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2.5 rounded-lg bg-white border border-surface-300 text-surface-600 hover:bg-brand-50 hover:border-brand-400 hover:text-brand-700 hover:shadow-md disabled:bg-surface-100 disabled:text-surface-400 disabled:border-surface-200 disabled:cursor-not-allowed transition-all duration-200 ease-in-out shadow-sm"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

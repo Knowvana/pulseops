@@ -217,7 +217,7 @@
       },
       "columns": {
         "level": "Level",
-        "time": "Time",
+        "time": "Time (IST)",
         "source": "Source",
         "event": "Event",
         "component": "Component",

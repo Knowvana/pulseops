@@ -1,12 +1,42 @@
 // ============================================================================
 // Request Logger Middleware — PulseOps API
 //
-// PURPOSE: Logs every incoming HTTP request with method, URL, status code,
-// and latency. Captures request/response bodies for API logging.
-// Persists logs to database asynchronously with IST timezone.
+// PURPOSE: This middleware automatically logs every incoming HTTP request to the PulseOps API.
+// It captures request details (method, URL, status code, latency), request/response bodies,
+// and persists them to the database for monitoring and debugging purposes.
+// The logging respects the logging configuration (captureApiCalls) to conditionally enable/disable API logging.
+//
+// HOW IT WORKS:
+// 1. Intercepts each incoming request in the Express middleware chain.
+// 2. Captures the request body (for non-GET requests) and intercepts the response.json to capture response body.
+// 3. Logs the request details to the console/file via the logger service.
+// 4. Asynchronously persists the log entry to the SystemLog table in the database.
+// 5. Checks the loggingConfig.json to determine if API calls should be logged (captureApiCalls flag).
+// 6. Skips logging for health checks and documentation endpoints.
+//
+// USAGE: This middleware is automatically applied to all routes in the Express app (see app.js).
+// No direct usage is required; it operates transparently for all API requests.
+//
+// WHO USES THIS FILE: The PulseOps API server uses this middleware for all incoming HTTP requests.
+// Developers can monitor API activity through the logs, and administrators can control logging via the settings.
 // ============================================================================
 import logger, { msg, logMessages } from '../logger.js';
 import { SystemLog } from '../database/models/index.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const CONFIG_DIR = path.resolve(__dirname, '../../config');
+
+function readJsonConfig(filename) {
+  try {
+    const filePath = path.join(CONFIG_DIR, filename);
+    if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (_) {}
+  return null;
+}
 
 function getISTTimestamp() {
   const now = new Date();
@@ -71,6 +101,10 @@ export default function requestLogger(req, res, next) {
 
 async function persistApiLog(req, res, latencyMs, reqBody, respBody) {
   try {
+    // Check logging config
+    const loggingConfig = readJsonConfig('loggingConfig.json') || { captureApiCalls: true };
+    if (!loggingConfig.captureApiCalls) return;
+
     // Skip logging for health checks and docs
     if (req.originalUrl.includes('/health') || req.originalUrl.includes('/docs')) {
       return;
