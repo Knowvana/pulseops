@@ -26,7 +26,10 @@
     "weekdayResourcesMax": "Weekday resources cannot exceed 999.",
     "weekendResourcesRequired": "Weekend resources is required. Please enter a value.",
     "weekendResourcesInvalid": "Weekend resources must be a positive number.",
-    "weekendResourcesMax": "Weekend resources cannot exceed 999."
+    "weekendResourcesMax": "Weekend resources cannot exceed 999.",
+    "shiftNameValidating": "Validating shift name...",
+    "shiftNameValid": "Shift name is available",
+    "shiftNameDuplicate": "This shift name already exists. Please use a different name."
   },
   "success": {
     "loginSuccess": "Signed in successfully.",

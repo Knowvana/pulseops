@@ -11,8 +11,8 @@
 // only receives the final state updates via setter props. Shift form
 // is displayed in a modal dialog using the shared Modal component.
 // ============================================================================
-import React, { useState } from 'react';
-import { Trash2, Plus, CalendarX2, Users, Clock, Edit, AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Trash2, Plus, CalendarX2, Users, Clock, Edit, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Modal, Button, TimePicker, ProgressBar, StatusTile, Logger } from '@shared';
 import { COLORS } from '@modules/roster/utils/rosterConstants';
 import RosterService from '@modules/roster/services/rosterService';
@@ -49,6 +49,11 @@ export default function RosterConfig({
 
   // Form validation state
   const [formErrors, setFormErrors] = useState({}); // { fieldName: errorMessage }
+
+  // Duplicate shift name validation state
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+  const [duplicateCheckResult, setDuplicateCheckResult] = useState(null); // { isDuplicate: boolean, checked: boolean }
+  const duplicateCheckTimeoutRef = useRef(null);
 
   // Validation function for shift form
   const validateShiftForm = () => {
@@ -92,12 +97,62 @@ export default function RosterConfig({
     return Object.keys(errors).length === 0;
   };
 
+  // Check for duplicate shift name with debounce
+  const checkDuplicateShiftName = async (shiftName) => {
+    if (!shiftName || shiftName.trim().length < 2) {
+      setDuplicateCheckResult(null);
+      return;
+    }
+
+    setIsCheckingDuplicate(true);
+    Logger.debug('RosterConfig', 'Starting duplicate shift name check', { shiftName });
+
+    try {
+      const result = await RosterService.checkDuplicateShiftName(shiftName.trim());
+      
+      if (result.error) {
+        Logger.warn('RosterConfig', 'Duplicate check failed', { error: result.error });
+        setDuplicateCheckResult({ isDuplicate: false, checked: true, error: true });
+      } else {
+        Logger.debug('RosterConfig', 'Duplicate check completed', { isDuplicate: result.exists });
+        setDuplicateCheckResult({ isDuplicate: result.exists, checked: true, error: false });
+      }
+    } catch (err) {
+      Logger.error('RosterConfig', 'Error checking duplicate shift name', { error: err.message });
+      setDuplicateCheckResult({ isDuplicate: false, checked: true, error: true });
+    } finally {
+      setIsCheckingDuplicate(false);
+    }
+  };
+
+  // Handle shift name change with debounce
+  const handleShiftNameChange = (value) => {
+    setNewShift({ ...newShift, label: value });
+    if (formErrors.label) setFormErrors({ ...formErrors, label: null });
+    
+    // Clear previous timeout
+    if (duplicateCheckTimeoutRef.current) {
+      clearTimeout(duplicateCheckTimeoutRef.current);
+    }
+
+    // Reset duplicate check result while typing
+    setDuplicateCheckResult(null);
+
+    // Set new timeout for duplicate check (500ms debounce)
+    duplicateCheckTimeoutRef.current = setTimeout(() => {
+      checkDuplicateShiftName(value);
+    }, 500);
+  };
+
   // Check if form is valid (for button enable/disable)
   const isFormValid = () => {
     return (
       newShift.label &&
       newShift.label.trim().length >= 2 &&
       newShift.label.trim().length <= 50 &&
+      !isCheckingDuplicate &&
+      duplicateCheckResult &&
+      !duplicateCheckResult.isDuplicate &&
       newShift.time &&
       /^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/.test(newShift.time.trim()) &&
       newShift.reqWeekday !== '' &&
@@ -118,6 +173,30 @@ export default function RosterConfig({
     if (!validateShiftForm()) {
       Logger.warn('RosterConfig', 'Shift form validation failed', {
         errors: formErrors,
+      });
+      return;
+    }
+
+    // Check if shift name is duplicate
+    if (duplicateCheckResult && duplicateCheckResult.isDuplicate) {
+      Logger.warn('RosterConfig', 'Shift name is duplicate', {
+        shiftName: newShift.label,
+      });
+      setShiftSaveStatus({
+        success: false,
+        message: messages.errors.shiftNameDuplicate,
+      });
+      return;
+    }
+
+    // Check if duplicate check was completed
+    if (!duplicateCheckResult || !duplicateCheckResult.checked) {
+      Logger.warn('RosterConfig', 'Duplicate check not completed', {
+        shiftName: newShift.label,
+      });
+      setShiftSaveStatus({
+        success: false,
+        message: 'Please wait for shift name validation to complete',
       });
       return;
     }
@@ -215,7 +294,7 @@ export default function RosterConfig({
       <div className="bg-white p-8 rounded-3xl border border-surface-200 shadow-sm flex flex-col">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-brand-50 to-teal-50 text-brand-600 rounded-xl"><Plus size={24} /></div>
+            <div className="p-3 bg-gradient-to-br from-brand-50 to-teal-50 text-brand-600 rounded-xl"><Clock size={24} /></div>
             <div>
               <h2 className="text-xl font-extrabold text-surface-800">{rosterTxt.shiftSchedule?.title || 'Shift Schedule'}</h2>
               <p className="text-sm text-surface-500 font-medium">{rosterTxt.shiftSchedule?.description || 'Define capacity requirements per shift'}</p>
@@ -227,39 +306,60 @@ export default function RosterConfig({
             </Button>
           )}
         </div>
+
+        {/* Horizontal Gradient Separator */}
+        <div className="flex items-center gap-4 py-4">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-300 to-transparent"></div>
+          <h3 className="text-lg font-bold text-surface-600 uppercase tracking-wider">Shift Details</h3>
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-300 to-transparent"></div>
+        </div>
         
         {/* Shift Grid - Hidden when modal is open */}
         {!showShiftModal && (
-        <div className="flex-1 space-y-4">
-          <div className="grid grid-cols-12 gap-4 px-4 text-xs font-bold text-surface-500 uppercase tracking-wider">
-            <div className="col-span-5">{rosterTxt.shiftSchedule?.columns?.shiftDetails || 'Shift Details'}</div>
-            <div className="col-span-3 text-center">{rosterTxt.shiftSchedule?.columns?.weekdayReq || 'Weekday Req'}</div>
-            <div className="col-span-3 text-center">{rosterTxt.shiftSchedule?.columns?.weekendReq || 'Weekend Req'}</div>
-            <div className="col-span-1"></div>
-          </div>
-          {shifts && shifts.length > 0 ? (
-            shifts.map(shift => (
-              <div key={shift.id} className="grid grid-cols-12 gap-4 items-center p-4 rounded-xl border border-surface-100 bg-gradient-to-r from-surface-50 to-white hover:border-surface-200 hover:shadow-sm transition-all">
-                <div className="col-span-5">
-                  <ShiftBadge shift={shift} className="w-fit mb-1.5" />
-                  <span className="text-[11px] font-bold text-surface-400 font-mono ml-1">{shift.time}</span>
-                </div>
-                <div className="col-span-3">
-                  <input type="number" min="0" value={shift.reqWeekday} onChange={(e) => updateShiftReq(shift.id, 'reqWeekday', e.target.value)} className="w-full text-center text-sm font-bold px-3 py-2 rounded-lg border border-surface-200 focus:ring-2 focus:ring-brand-500 outline-none" />
-                </div>
-                <div className="col-span-3">
-                  <input type="number" min="0" value={shift.reqWeekend} onChange={(e) => updateShiftReq(shift.id, 'reqWeekend', e.target.value)} className="w-full text-center text-sm font-bold px-3 py-2 rounded-lg border border-surface-200 focus:ring-2 focus:ring-brand-500 outline-none" />
-                </div>
-                <div className="col-span-1 flex justify-end">
-                  <button onClick={() => removeShift(shift.id)} className="text-surface-400 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={18} /></button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-12 border-2 border-dashed border-surface-200 rounded-2xl text-surface-400 text-sm font-medium">
-              No shifts configured yet. Click "Add Shift" to create one.
-            </div>
-          )}
+        <div className="flex-1 overflow-x-auto custom-scrollbar">
+          <table className="w-full border-collapse">
+            <thead className="bg-surface-50/80 border-b border-surface-200 sticky top-0 z-10">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-surface-500 uppercase tracking-widest border-r border-surface-200">{rosterTxt.shiftSchedule?.columns?.shiftName || 'Shift Name'}</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-surface-500 uppercase tracking-widest border-r border-surface-200">{rosterTxt.shiftSchedule?.columns?.shiftTimes || 'Shift Times'}</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-surface-500 uppercase tracking-widest border-r border-surface-200">{rosterTxt.shiftSchedule?.columns?.weekdayReq || 'Weekday Req'}</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-surface-500 uppercase tracking-widest border-r border-surface-200">{rosterTxt.shiftSchedule?.columns?.weekendReq || 'Weekend Req'}</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-surface-500 uppercase tracking-widest">{rosterTxt.shiftSchedule?.columns?.actions || 'Actions'}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-100">
+              {shifts && shifts.length > 0 ? (
+                shifts.map(shift => (
+                  <tr key={shift.id} className="hover:bg-surface-50/50 transition-colors">
+                    <td className="px-6 py-4 border-r border-surface-100">
+                      <ShiftBadge shift={shift} className="w-fit" />
+                    </td>
+                    <td className="px-6 py-4 text-sm font-bold text-surface-600 font-mono border-r border-surface-100">
+                      {shift.startTime && shift.endTime ? `${shift.startTime} - ${shift.endTime}` : shift.time || 'Not set'}
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm font-bold text-surface-700 border-r border-surface-100">
+                      {shift.reqWeekday || 0}
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm font-bold text-surface-700 border-r border-surface-100">
+                      {shift.reqWeekend || 0}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => {/* TODO: Add edit functionality */}} className="text-surface-400 hover:text-brand-600 p-2 hover:bg-brand-50 rounded-lg transition-colors"><Edit size={18} /></button>
+                        <button onClick={() => removeShift(shift.id)} className="text-surface-400 hover:text-rose-600 p-2 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={18} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="px-6 py-12 text-center border-2 border-dashed border-surface-200 text-surface-400 text-sm font-medium">
+                    No shifts configured yet. Click "Add Shift" to create one.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
         )}
       </div>
@@ -377,16 +477,40 @@ export default function RosterConfig({
                 type="text"
                 placeholder={rosterTxt.shiftSchedule?.form?.shiftPlaceholder || 'e.g., Morning, Evening'}
                 value={newShift.label}
-                onChange={(e) => {
-                  setNewShift({ ...newShift, label: e.target.value });
-                  if (formErrors.label) setFormErrors({ ...formErrors, label: null });
-                }}
+                onChange={(e) => handleShiftNameChange(e.target.value)}
                 className={`w-full px-4 py-3 rounded-xl border font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)] focus:outline-none focus:ring-2 ${
                   formErrors.label
                     ? 'border-rose-300 focus:ring-rose-500'
                     : 'border-surface-200 focus:ring-brand-500'
                 }`}
               />
+              
+              {/* Progress Bar - Show while checking for duplicates */}
+              {isCheckingDuplicate && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-semibold text-brand-600">{messages.errors.shiftNameValidating}</p>
+                  <ProgressBar progress={50} />
+                </div>
+              )}
+
+              {/* Validation Result - Show after check completes */}
+              {duplicateCheckResult && duplicateCheckResult.checked && !isCheckingDuplicate && (
+                <div className="mt-3">
+                  {duplicateCheckResult.isDuplicate ? (
+                    <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+                      <XCircle size={18} className="text-rose-600 shrink-0" />
+                      <span className="text-sm font-semibold text-rose-700">{messages.errors.shiftNameDuplicate}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <CheckCircle size={18} className="text-emerald-600 shrink-0" />
+                      <span className="text-sm font-semibold text-emerald-700">{messages.errors.shiftNameValid}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Form validation error - Show if name format is invalid */}
               {formErrors.label && (
                 <div className="flex items-center gap-2 mt-2 text-xs text-rose-600">
                   <AlertCircle size={14} />
@@ -514,6 +638,11 @@ export default function RosterConfig({
                 Logger.debug('RosterConfig', 'User cancelled shift creation');
                 setShowShiftModal(false);
                 setFormErrors({});
+                setDuplicateCheckResult(null);
+                setIsCheckingDuplicate(false);
+                if (duplicateCheckTimeoutRef.current) {
+                  clearTimeout(duplicateCheckTimeoutRef.current);
+                }
               }}
               className="px-3 py-1 w-32"
               disabled={isSavingShift}

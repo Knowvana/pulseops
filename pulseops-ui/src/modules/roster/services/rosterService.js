@@ -94,6 +94,45 @@ const RosterService = {
   },
 
   /**
+   * Check if a shift name already exists in the database.
+   * @param {string} shiftName - The shift name to validate
+   * @returns {Promise<Object>} { exists: boolean, error?: string }
+   */
+  async checkDuplicateShiftName(shiftName) {
+    try {
+      Logger.debug('RosterService', 'Checking for duplicate shift name', { 
+        shiftName 
+      });
+
+      const response = await ApiClient.get(`${SHIFTS_URL}?name=${encodeURIComponent(shiftName)}`);
+
+      if (!response.success) {
+        Logger.error('RosterService', 'Failed to check duplicate shift name', { 
+          shiftName,
+          error: response.error?.message 
+        });
+        return { exists: false, error: response.error?.message };
+      }
+
+      // Check if any shift with this name exists
+      const isDuplicate = response.data && response.data.length > 0;
+
+      Logger.debug('RosterService', 'Duplicate check completed', { 
+        shiftName,
+        isDuplicate 
+      });
+
+      return { exists: isDuplicate };
+    } catch (err) {
+      Logger.error('RosterService', 'Error checking duplicate shift name', { 
+        shiftName,
+        error: err.message 
+      });
+      return { exists: false, error: err.message };
+    }
+  },
+
+  /**
    * Fetch all shifts from the database.
    * @returns {Promise<Array>} List of shift records
    */

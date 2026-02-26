@@ -106,53 +106,82 @@ export default function RosterDashboard({
     const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {shifts.map(shift => {
-          const workers = daySchedule[shift.id] || [];
-          const required = isWeekend ? shift.reqWeekend : shift.reqWeekday;
-          return (
-            <div
-              key={shift.id}
-              onClick={() => openEditModal(dateKey, shift.id, workers)}
-              className={`group bg-white rounded-2xl border ${shift.color.replace('bg-', 'border-').split(' ')[2]} shadow-sm overflow-hidden flex flex-col transition-all duration-300 hover:shadow-md cursor-pointer hover:ring-2 ring-brand-500/20`}
-            >
-              <div className={`p-4 border-b flex justify-between items-center ${shift.color} bg-opacity-20`}>
-                <div>
-                  <h3 className="font-extrabold text-lg tracking-tight">{shift.label}</h3>
-                  <p className="text-xs opacity-80 font-mono mt-0.5">{shift.time}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-white/60 rounded-full text-brand-700 backdrop-blur-sm shadow-sm">
-                    <Edit2 size={16} />
-                  </div>
-                  <div className="text-right flex flex-col items-end">
-                    <span className="text-2xl font-black tracking-tighter leading-none">{workers.length}</span>
-                    <span className="text-[10px] font-bold opacity-80 mt-1 uppercase tracking-wider">/ {required} Req</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 flex-1 bg-surface-50/30">
-                {workers.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {workers.map(empId => {
-                      const emp = employees.find(e => e.id === empId);
-                      return (
-                        <div key={empId} className="flex items-center gap-2.5 p-2 rounded-xl bg-white border border-surface-200 shadow-sm">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-inner ${shift.color.split(' ')[0].replace('100', '500')}`}>
-                            {emp?.name.charAt(0)}
+      <div className="bg-white rounded-2xl border border-surface-200 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-surface-100">
+          <h3 className="text-xl font-extrabold text-surface-800 tracking-tight">{currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3>
+          <p className="text-sm text-surface-500 font-medium mt-1">{isWeekend ? 'Weekend Schedule' : 'Weekday Schedule'}</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-surface-50/80 border-b border-surface-200">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-surface-500 uppercase tracking-widest">Shift</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-surface-500 uppercase tracking-widest">Time</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-surface-500 uppercase tracking-widest">Required</th>
+                <th className="px-6 py-4 text-center text-xs font-bold text-surface-500 uppercase tracking-widest">Assigned</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-surface-500 uppercase tracking-widest">Staff</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-100">
+              {shifts.map(shift => {
+                const workers = daySchedule[shift.id] || [];
+                const required = isWeekend ? shift.reqWeekend : shift.reqWeekday;
+                return (
+                  <tr
+                    key={shift.id}
+                    onClick={() => openEditModal(dateKey, shift.id, workers)}
+                    className="hover:bg-surface-50/50 transition-colors cursor-pointer group"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${shift.color.split(' ')[0].replace('100', '500')} shadow-sm`}></div>
+                        <span className="font-bold text-surface-800">{shift.label}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-mono text-surface-600">{shift.time}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-surface-100 text-surface-700 font-bold text-sm">{required}</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                        workers.length >= required ? 'bg-green-100 text-green-700' : 
+                        workers.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                      }`}>
+                        {workers.length}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {workers.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {workers.slice(0, 3).map(empId => {
+                              const emp = employees.find(e => e.id === empId);
+                              return (
+                                <span key={empId} className={`text-xs font-bold px-2 py-1 rounded-md border ${shift.color} bg-opacity-30 shadow-sm`}>
+                                  {emp?.name || 'Unknown'}
+                                </span>
+                              );
+                            })}
+                            {workers.length > 3 && (
+                              <span className="text-xs font-bold px-2 py-1 rounded-md bg-surface-100 text-surface-600 border border-surface-200">
+                                +{workers.length - 3} more
+                              </span>
+                            )}
                           </div>
-                          <span className="font-bold text-sm text-surface-700 truncate">{emp?.name || 'Unknown'}</span>
+                        ) : (
+                          <span className="text-sm text-surface-400 italic">Click to assign staff</span>
+                        )}
+                        <div className="ml-auto opacity-0 group-hover:opacity-100 text-brand-500 transition-opacity">
+                          <Edit2 size={16} />
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="h-24 flex items-center justify-center text-surface-400 italic text-sm font-medium bg-white rounded-xl border border-dashed border-surface-200">Click to assign staff</div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
