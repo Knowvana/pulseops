@@ -450,8 +450,9 @@
           "timeLabel": "Shift Time",
           "timePlaceholder": "e.g., 09:00 - 17:00",
           "colorLabel": "Shift Color",
-          "weekdayLabel": "Weekday Requirement",
-          "weekendLabel": "Weekend Requirement",
+          "resourcesLabel": "Minimum Resources in Shift",
+          "weekdayLabel": "Minimum Resources in Shift for Weekdays",
+          "weekendLabel": "Minimum Resources in Shift for Weekends",
           "submitButton": "Create Shift",
           "cancelButton": "Cancel"
         }

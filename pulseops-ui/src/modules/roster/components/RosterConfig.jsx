@@ -13,7 +13,7 @@
 // ============================================================================
 import React, { useState } from 'react';
 import { Trash2, Plus, CalendarX2, Users } from 'lucide-react';
-import { Modal, Button } from '@shared';
+import { Modal, Button, TimePicker } from '@shared';
 import { COLORS } from '@modules/roster/utils/rosterConstants';
 import uiText from '@shared/config/uiElementsText.json';
 
@@ -81,12 +81,15 @@ export default function RosterConfig({
               <p className="text-sm text-surface-500 font-medium">{rosterTxt.shiftSchedule?.description || 'Define capacity requirements per shift'}</p>
             </div>
           </div>
-          <Button variant="primary" onClick={() => setShowShiftModal(true)} icon={<Plus size={16} />}>
-            {rosterTxt.shiftSchedule?.addButton || 'Add Shift'}
-          </Button>
+          {!showShiftModal && (
+            <Button variant="primary" onClick={() => setShowShiftModal(true)} icon={<Plus size={16} />}>
+              {rosterTxt.shiftSchedule?.addButton || 'Add Shift'}
+            </Button>
+          )}
         </div>
         
-        {/* Shift Grid */}
+        {/* Shift Grid - Hidden when modal is open */}
+        {!showShiftModal && (
         <div className="flex-1 space-y-4">
           <div className="grid grid-cols-12 gap-4 px-4 text-xs font-bold text-surface-500 uppercase tracking-wider">
             <div className="col-span-5">{rosterTxt.shiftSchedule?.columns?.shiftDetails || 'Shift Details'}</div>
@@ -118,6 +121,7 @@ export default function RosterConfig({
             </div>
           )}
         </div>
+        )}
       </div>
       )}
 
@@ -203,12 +207,14 @@ export default function RosterConfig({
       </div>
       )}
 
-      {/* SHIFT FORM MODAL */}
+      {/* SHIFT FORM MODAL - Only show when in shift configuration view */}
+      {showOnlyShifts && (
       <Modal
         isOpen={showShiftModal}
         onClose={() => setShowShiftModal(false)}
         title={rosterTxt.shiftSchedule?.form?.title || 'Add New Shift'}
-        size="md"
+        size="lg"
+        className="max-w-2xl"
       >
         <div className="space-y-5">
           {/* Shift Label */}
@@ -223,15 +229,13 @@ export default function RosterConfig({
             />
           </div>
 
-          {/* Shift Time */}
+          {/* Shift Time - Using Beautiful Time Picker */}
           <div>
             <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.timeLabel || 'Shift Time'}</label>
-            <input
-              type="text"
-              placeholder={rosterTxt.shiftSchedule?.form?.timePlaceholder || 'e.g., 09:00 - 17:00'}
+            <TimePicker
               value={newShift.time}
-              onChange={(e) => setNewShift({ ...newShift, time: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm"
+              onChange={(time) => setNewShift({ ...newShift, time })}
+              label={rosterTxt.shiftSchedule?.form?.timePlaceholder || 'e.g., 09:00 - 17:00'}
             />
           </div>
 
@@ -252,9 +256,16 @@ export default function RosterConfig({
             </div>
           </div>
 
+          {/* Gradient Separator */}
+          <div className="flex items-center gap-3 py-2">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-300 to-transparent"></div>
+            <span className="text-xs font-bold text-surface-400 uppercase tracking-widest">{rosterTxt.shiftSchedule?.form?.resourcesLabel || 'Minimum Resources in Shift'}</span>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-300 to-transparent"></div>
+          </div>
+
           {/* Weekday Requirement */}
           <div>
-            <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.weekdayLabel || 'Weekday Requirement'}</label>
+            <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.weekdayLabel || 'Minimum Resources in Shift for Weekdays'}</label>
             <input
               type="number"
               min="0"
@@ -267,7 +278,7 @@ export default function RosterConfig({
 
           {/* Weekend Requirement */}
           <div>
-            <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.weekendLabel || 'Weekend Requirement'}</label>
+            <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.weekendLabel || 'Minimum Resources in Shift for Weekends'}</label>
             <input
               type="number"
               min="0"
@@ -298,6 +309,7 @@ export default function RosterConfig({
           </div>
         </div>
       </Modal>
+      )}
     </div>
   );
 }
