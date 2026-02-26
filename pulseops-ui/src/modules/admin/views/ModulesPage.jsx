@@ -384,45 +384,53 @@ function SchemaInitStep({ module, schemaStatus, onStatusChange, onNext, onBack }
   return (
     <div className="space-y-4">
       <div className="p-4 bg-surface-50 rounded-xl border border-surface-200">
-        <h4 className="font-bold text-surface-800 mb-2 flex items-center gap-2">
-          <Database size={16} className="text-brand-500" />
-          {uiText.platformAdmin.modules?.initTitle || 'Initialize Database Schema'}
-        </h4>
-
-        {isAlreadyInitialized ? (
-          <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-            <CheckCircle2 size={20} className="text-emerald-600" />
-            <div>
-              <p className="font-bold text-emerald-800 text-sm">Schema Already Initialized</p>
-              <p className="text-xs text-emerald-600 mt-0.5">All required tables exist. You can proceed to the next step.</p>
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center">
+              <Database size={24} className="text-blue-600" />
             </div>
           </div>
-        ) : (
-          <>
-            <p className="text-sm text-surface-600 mb-4">
-              This will create {(module?.requiredTables || []).length} database tables required by the {module?.name} module.
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-surface-800 mb-1 flex items-center gap-2">
+              <Database size={16} className="text-blue-500" />
+              Initialize Database Schema
+            </h4>
+            <p className="text-sm text-surface-600 mb-3">
+              Create {module?.requiredTables?.length || 0} tables for the {module?.name} module
             </p>
-            {!result && !error && (
-              <button
-                onClick={handleInitialize}
-                disabled={initializing}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-brand-600 to-teal-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-brand-600/20 hover:from-brand-700 hover:to-teal-700 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {initializing ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-                {initializing ? 'Creating tables...' : 'Create Schema Now'}
-              </button>
-            )}
-            {result && (
-              <SchemaResultDetail result={result} moduleName={module?.name} />
-            )}
-            {error && (
-              <div className="flex items-center gap-3 p-3 bg-rose-50 rounded-lg border border-rose-200">
-                <AlertCircle size={20} className="text-rose-600" />
-                <p className="font-bold text-rose-800 text-sm">{error}</p>
+
+            {isAlreadyInitialized ? (
+              <div className="flex items-center gap-3 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
+                <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                <span className="text-sm font-medium text-emerald-800">Schema already initialized</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleInitialize}
+                  disabled={initializing}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-semibold shadow-lg shadow-blue-600/20 hover:from-blue-700 hover:to-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {initializing ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                  {initializing ? 'Creating...' : 'Create Schema'}
+                </button>
               </div>
             )}
-          </>
-        )}
+
+            {result && (
+              <div className="mt-3">
+                <SchemaResultDetail result={result} moduleName={module?.name} />
+              </div>
+            )}
+
+            {error && (
+              <div className="flex items-center gap-3 p-2 bg-rose-50 rounded-lg border border-rose-200 mt-3">
+                <AlertCircle size={16} className="text-rose-600 flex-shrink-0" />
+                <span className="text-sm font-medium text-rose-800">{error}</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center justify-between pt-2">

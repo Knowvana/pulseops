@@ -424,6 +424,64 @@
       "config": "Configuration",
       "reports": "Reports",
       "settings": "Settings"
+    },
+    "config": {
+      "pageTitle": "Roster Configuration",
+      "pageSubtitle": "Manage shifts, employees, leaves, and resources",
+      "tabs": {
+        "shiftConfig": "Shift Configuration",
+        "resourceConfig": "Resource Configuration",
+        "leaveConfig": "Leave Configuration"
+      },
+      "shiftSchedule": {
+        "title": "Shift Schedule",
+        "description": "Define capacity requirements per shift",
+        "addButton": "Add Shift",
+        "columns": {
+          "shiftDetails": "Shift Details",
+          "weekdayReq": "Weekday Req",
+          "weekendReq": "Weekend Req",
+          "action": "Action"
+        },
+        "form": {
+          "title": "Add New Shift",
+          "shiftLabel": "Shift Label",
+          "shiftPlaceholder": "e.g., Morning, Evening",
+          "timeLabel": "Shift Time",
+          "timePlaceholder": "e.g., 09:00 - 17:00",
+          "colorLabel": "Shift Color",
+          "weekdayLabel": "Weekday Requirement",
+          "weekendLabel": "Weekend Requirement",
+          "submitButton": "Create Shift",
+          "cancelButton": "Cancel"
+        }
+      },
+      "resourcePool": {
+        "title": "Resource Pool",
+        "description": "Managing {count} active resources",
+        "addButton": "Add",
+        "inputPlaceholder": "Enter new employee name...",
+        "columns": {
+          "name": "Name",
+          "role": "Role",
+          "action": "Action"
+        }
+      },
+      "plannedLeaves": {
+        "title": "Planned Leaves",
+        "description": "Manage employee leave schedules",
+        "addButton": "Add Leave",
+        "columns": {
+          "employee": "Employee",
+          "date": "Date",
+          "action": "Action"
+        },
+        "noData": "No upcoming leaves registered."
+      },
+      "dataManagement": {
+        "title": "Data Management",
+        "description": "Load demo data or reset roster"
+      }
     }
   },
   "common": {

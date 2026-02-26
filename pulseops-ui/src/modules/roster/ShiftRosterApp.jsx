@@ -29,9 +29,8 @@ import uiText from '@shared/config/uiElementsText.json';
 import messages from '@shared/config/messages.json';
 import urls from '@shared/config/urls.json';
 import RosterDashboard from '@modules/roster/components/RosterDashboard';
-import RosterConfig from '@modules/roster/components/RosterConfig';
 import RosterReports from '@modules/roster/components/RosterReports';
-import RosterSettings from '@modules/roster/components/RosterSettings';
+import RosterConfigPage from '@modules/roster/views/RosterConfigPage';
 import { generateRoster, getSafeDateKey } from '@modules/roster/utils/rosterUtils';
 
 export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange }) {
@@ -228,27 +227,6 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
 
   const hasData = employees.length > 0 || shifts.length > 0;
 
-  // --- Settings View (uses universal SettingsConfig) ---
-  const renderSettingsView = () => {
-    const tabs = [
-      {
-        id: 'data',
-        label: 'Data Management',
-        icon: Database,
-        content: <RosterSettings onDataAction={(action) => handleDataAction(action)} />,
-      },
-    ];
-    return (
-      <SettingsConfig
-        title="Shift Roaster Settings"
-        subtitle="Module configuration and data management"
-        icon={SettingsIcon}
-        tabs={tabs}
-        defaultTab="data"
-      />
-    );
-  };
-
   // --- Render content based on active tab ---
   const renderContent = () => {
     if (dataLoading) {
@@ -303,17 +281,16 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
         );
       case 'config':
         return (
-          <RosterConfig
+          <RosterConfigPage
             shifts={shifts}
             setShifts={setShifts}
             employees={employees}
             setEmployees={setEmployees}
             leaves={leaves}
             setLeaves={setLeaves}
+            onDataAction={handleDataAction}
           />
         );
-      case 'settings':
-        return renderSettingsView();
       default:
         return null;
     }
