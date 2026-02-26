@@ -437,6 +437,92 @@ const RosterService = {
       return { success: false, error: { message: err.message, code: 'DELETE_LEAVE_ERROR' } };
     }
   },
+
+  /**
+   * Load demo data for the Roster module.
+   * @returns {Promise<Object>} { success, data, error }
+   */
+  async loadDemoData() {
+    try {
+      Logger.info('RosterService', 'Loading demo data for roster module');
+
+      const response = await ApiClient.post(`${SHIFTS_URL.replace('/shifts', '')}/demo-data`, {});
+
+      if (!response.success) {
+        Logger.error('RosterService', 'Failed to load demo data', { 
+          error: response.error?.message 
+        });
+        return { success: false, error: response.error };
+      }
+
+      Logger.info('RosterService', 'Demo data loaded successfully', { 
+        counts: response.data?.counts 
+      });
+
+      return { success: true, data: response.data };
+    } catch (err) {
+      Logger.error('RosterService', 'Error loading demo data', { 
+        error: err.message 
+      });
+      return { success: false, error: { message: err.message, code: 'LOAD_DEMO_ERROR' } };
+    }
+  },
+
+  /**
+   * Remove all roster data (hard reset).
+   * @returns {Promise<Object>} { success, error }
+   */
+  async hardResetRosterData() {
+    try {
+      Logger.warn('RosterService', 'Initiating hard reset of roster data');
+
+      const response = await ApiClient.delete(`${SHIFTS_URL.replace('/shifts', '')}/all`);
+
+      if (!response.success) {
+        Logger.error('RosterService', 'Failed to hard reset roster data', { 
+          error: response.error?.message 
+        });
+        return { success: false, error: response.error };
+      }
+
+      Logger.info('RosterService', 'Roster data hard reset completed successfully');
+
+      return { success: true };
+    } catch (err) {
+      Logger.error('RosterService', 'Error during hard reset', { 
+        error: err.message 
+      });
+      return { success: false, error: { message: err.message, code: 'HARD_RESET_ERROR' } };
+    }
+  },
+
+  /**
+   * Remove demo data from the roster.
+   * @returns {Promise<Object>} { success, error }
+   */
+  async removeDemoData() {
+    try {
+      Logger.info('RosterService', 'Removing demo data from roster');
+
+      const response = await ApiClient.delete(`${SHIFTS_URL.replace('/shifts', '')}/demo-data`);
+
+      if (!response.success) {
+        Logger.error('RosterService', 'Failed to remove demo data', { 
+          error: response.error?.message 
+        });
+        return { success: false, error: response.error };
+      }
+
+      Logger.info('RosterService', 'Demo data removed successfully');
+
+      return { success: true };
+    } catch (err) {
+      Logger.error('RosterService', 'Error removing demo data', { 
+        error: err.message 
+      });
+      return { success: false, error: { message: err.message, code: 'REMOVE_DEMO_ERROR' } };
+    }
+  },
 };
 
 export default RosterService;

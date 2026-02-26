@@ -51,6 +51,8 @@
   "confirm": {
     "loadDemoData": "This will add sample employees and shifts to your roster. Is that okay?",
     "deleteAllRoster": "Warning: This action cannot be undone. All roster data will be permanently erased.",
+    "removeDemoData": "This will remove all demo/sample data from the roster. Continue?",
+    "hardReset": "WARNING: This will permanently delete ALL roster data including shifts, employees, leaves, and configurations. This action cannot be undone. Are you absolutely sure?",
     "wipeDatabase": "WARNING: This will permanently DROP ALL database tables including all module data and schema. The database will be completely empty after this operation. This action cannot be undone.",
     "initializeDb": "This will create the core system database tables (system_users, system_config, system_logs, system_modules). Module-specific tables are created from Module Management. Continue?",
     "deleteUser": "Are you sure you want to delete this user? This action cannot be undone.",

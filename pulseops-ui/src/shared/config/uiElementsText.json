@@ -483,6 +483,33 @@
         "title": "Data Management",
         "description": "Load demo data or reset roster"
       }
+    },
+    "settings": {
+      "pageTitle": "Roster Settings",
+      "pageSubtitle": "Manage roster data and system configuration",
+      "tabs": {
+        "dataManagement": "Data Management"
+      }
+    },
+    "dataManagement": {
+      "title": "Data Management",
+      "subtitle": "Manage roster data, load samples, or reset the system",
+      "actions": {
+        "loadDemoTitle": "Load Demo Data",
+        "loadDemoDesc": "Populate roster with sample shifts, employees, and leaves",
+        "removeDemoTitle": "Remove Demo Data",
+        "removeDemoDesc": "Delete all sample data while keeping custom data intact",
+        "hardResetTitle": "Hard Reset",
+        "hardResetDesc": "Permanently delete all roster data. This action cannot be undone."
+      },
+      "buttons": {
+        "execute": "Execute",
+        "remove": "Remove",
+        "reset": "Hard Reset"
+      },
+      "warnings": {
+        "hardReset": "Warning: This will delete all shifts, employees, leaves, and configurations. This action cannot be undone."
+      }
     }
   },
   "common": {

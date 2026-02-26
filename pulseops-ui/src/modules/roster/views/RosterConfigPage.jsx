@@ -20,7 +20,6 @@ import React from 'react';
 import { Settings as SettingsIcon, Sliders, Users, CalendarX2 } from 'lucide-react';
 import { SettingsConfig } from '@shared';
 import RosterConfig from '@modules/roster/components/RosterConfig';
-import RosterSettings from '@modules/roster/components/RosterSettings';
 import uiText from '@shared/config/uiElementsText.json';
 
 const rosterTxt = uiText.shiftRoster?.config || {};
@@ -49,14 +48,11 @@ export default function RosterConfigPage({
       label: rosterTxt.tabs?.resourceConfig || 'Resource Configuration',
       icon: Users,
       content: (
-        <div className="space-y-8">
-          <RosterConfig
-            employees={employees}
-            setEmployees={setEmployees}
-            showOnlyResourcePool={true}
-          />
-          <RosterSettings onDataAction={onDataAction} />
-        </div>
+        <RosterConfig
+          employees={employees}
+          setEmployees={setEmployees}
+          showOnlyResourcePool={true}
+        />
       ),
     },
     {

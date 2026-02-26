@@ -31,6 +31,8 @@ import urls from '@shared/config/urls.json';
 import RosterDashboard from '@modules/roster/components/RosterDashboard';
 import RosterReports from '@modules/roster/components/RosterReports';
 import RosterConfigPage from '@modules/roster/views/RosterConfigPage';
+import RosterSettingsPage from '@modules/roster/views/RosterSettingsPage';
+import RosterService from '@modules/roster/services/rosterService';
 import { generateRoster, getSafeDateKey } from '@modules/roster/utils/rosterUtils';
 
 export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange }) {
@@ -192,26 +194,77 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
   const handleConfirm = useCallback(async () => {
     if (!confirmAction) return;
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 600));
 
-    if (confirmAction.type === 'load_demo') {
-      const demo = loadRosterDemo();
-      setEmployees(demo.employees);
-      setShifts(demo.shifts);
-      setLeaves([]);
-      setSchedule(null);
-      Logger.info('ShiftRoster', logsConfig.messages.roster.demoLoaded);
-    } else if (confirmAction.type === 'delete_all') {
-      setEmployees([]);
-      setShifts([]);
-      setLeaves([]);
-      setSchedule(null);
-      setGenerationError(null);
-      Logger.info('ShiftRoster', logsConfig.messages.roster.dataCleared);
+    try {
+      if (confirmAction.type === 'load_demo') {
+        Logger.info('ShiftRoster', 'Loading demo data via API');
+        const result = await RosterService.loadDemoData();
+        
+        if (result.success) {
+          // Refresh data from API
+          const [shiftsRes, employeesRes, leavesRes] = await Promise.allSettled([
+            ApiClient.get(urls.rosterShiftsEndpoint),
+            ApiClient.get(urls.rosterEmployeesEndpoint),
+            ApiClient.get(urls.rosterLeavesEndpoint),
+          ]);
+          
+          if (shiftsRes.status === 'fulfilled' && shiftsRes.value?.data) setShifts(shiftsRes.value.data);
+          if (employeesRes.status === 'fulfilled' && employeesRes.value?.data) setEmployees(employeesRes.value.data);
+          if (leavesRes.status === 'fulfilled' && leavesRes.value?.data) setLeaves(leavesRes.value.data);
+          
+          setSchedule(null);
+          Logger.info('ShiftRoster', logsConfig.messages.roster.demoLoaded);
+        } else {
+          Logger.error('ShiftRoster', 'Failed to load demo data', { error: result.error?.message });
+          throw new Error(result.error?.message || 'Failed to load demo data');
+        }
+      } else if (confirmAction.type === 'remove_demo') {
+        Logger.info('ShiftRoster', 'Removing demo data via API');
+        const result = await RosterService.removeDemoData();
+        
+        if (result.success) {
+          // Refresh data from API
+          const [shiftsRes, employeesRes, leavesRes] = await Promise.allSettled([
+            ApiClient.get(urls.rosterShiftsEndpoint),
+            ApiClient.get(urls.rosterEmployeesEndpoint),
+            ApiClient.get(urls.rosterLeavesEndpoint),
+          ]);
+          
+          if (shiftsRes.status === 'fulfilled' && shiftsRes.value?.data) setShifts(shiftsRes.value.data);
+          if (employeesRes.status === 'fulfilled' && employeesRes.value?.data) setEmployees(employeesRes.value.data);
+          if (leavesRes.status === 'fulfilled' && leavesRes.value?.data) setLeaves(leavesRes.value.data);
+          
+          setSchedule(null);
+          Logger.info('ShiftRoster', 'Demo data removed successfully');
+        } else {
+          Logger.error('ShiftRoster', 'Failed to remove demo data', { error: result.error?.message });
+          throw new Error(result.error?.message || 'Failed to remove demo data');
+        }
+      } else if (confirmAction.type === 'hard_reset') {
+        Logger.warn('ShiftRoster', 'Performing hard reset of roster data');
+        const result = await RosterService.hardResetRosterData();
+        
+        if (result.success) {
+          setEmployees([]);
+          setShifts([]);
+          setLeaves([]);
+          setSchedule(null);
+          setGenerationError(null);
+          Logger.info('ShiftRoster', 'Hard reset completed successfully');
+        } else {
+          Logger.error('ShiftRoster', 'Failed to hard reset', { error: result.error?.message });
+          throw new Error(result.error?.message || 'Failed to hard reset');
+        }
+      }
+      
+      setIsProcessing(false);
+      setProcessSuccess(true);
+    } catch (err) {
+      Logger.error('ShiftRoster', 'Data action failed', { error: err.message });
+      setIsProcessing(false);
+      setProcessSuccess(false);
+      setConfirmAction(null);
     }
-
-    setIsProcessing(false);
-    setProcessSuccess(true);
   }, [confirmAction]);
 
   const handleSuccessClose = useCallback(() => {
@@ -288,6 +341,12 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
             setEmployees={setEmployees}
             leaves={leaves}
             setLeaves={setLeaves}
+            onDataAction={handleDataAction}
+          />
+        );
+      case 'settings':
+        return (
+          <RosterSettingsPage
             onDataAction={handleDataAction}
           />
         );
