@@ -3,18 +3,24 @@
 //
 // PURPOSE: Main planner grid for the Shift Roster module. Displays the
 // generated schedule in daily, weekly, or monthly view modes. Supports
-// inline editing of shift assignments via a floating modal.
+// inline editing of shift assignments via a floating modal. Includes the
+// live current-shift header bar.
 //
-// ARCHITECTURE: Module-specific component. Uses roster utils for date keys.
-// All UI elements follow the shared brand/surface color palette.
+// ARCHITECTURE: Module-specific component. Consumes shared roster state
+// from RosterContext via useRoster(). All UI elements follow the shared
+// brand/surface color palette.
 // ============================================================================
 import React, { useState } from 'react';
 import {
   List, CalendarDays, Grid, ChevronLeft, ChevronRight,
-  RefreshCw, Download, Users, AlertCircle, Edit2, X, Save, CheckCircle2
+  RefreshCw, Download, Users, AlertCircle, Edit2, X, Save, CheckCircle2,
+  Clock, Calendar, Timer, UserCheck, Loader2
 } from 'lucide-react';
+import { EmptyState } from '@shared';
+import messages from '@shared/config/messages.json';
 import { getSafeDateKey } from '@modules/roster/utils/rosterUtils';
 import { WEEKDAYS } from '@modules/roster/utils/rosterConstants';
+import { useRoster } from '@modules/roster/context/RosterContext';
 
 // --- Edit Modal Component ---
 const EditShiftModal = ({ isOpen, onClose, dateKey, shift, assignedIds, employees, onSave }) => {
@@ -84,11 +90,14 @@ const EditShiftModal = ({ isOpen, onClose, dateKey, shift, assignedIds, employee
   );
 };
 
-export default function RosterDashboard({
-  schedule, employees, shifts, viewMode, setViewMode,
-  currentDate, navigateDate, getDisplayDateRange,
-  handleGenerate, downloadCSV, generationError, onUpdateSchedule
-}) {
+export default function RosterDashboard({ onNavigateToConfig }) {
+  const {
+    schedule, employees, shifts, viewMode, setViewMode,
+    currentDate, navigateDate, getDisplayDateRange,
+    handleGenerate, downloadCSV, generationError, handleUpdateSchedule,
+    currentShiftInfo, shiftTimeLeft, dataLoading, hasData, handleDataAction,
+  } = useRoster();
+
   const [editingShift, setEditingShift] = useState(null);
 
   const openEditModal = (dateKey, shiftId, currentWorkers) => {
@@ -96,9 +105,29 @@ export default function RosterDashboard({
   };
 
   const handleSaveEdit = (newWorkers) => {
-    onUpdateSchedule(editingShift.dateKey, editingShift.shiftId, newWorkers);
+    handleUpdateSchedule(editingShift.dateKey, editingShift.shiftId, newWorkers);
     setEditingShift(null);
   };
+
+  const cs = currentShiftInfo;
+
+  if (dataLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <Loader2 className="animate-spin text-brand-500" size={32} />
+      </div>
+    );
+  }
+
+  if (!hasData) {
+    return (
+      <EmptyState
+        module="roster_planner"
+        onPrimaryAction={() => onNavigateToConfig?.()}
+        onSecondaryAction={() => handleDataAction({ type: 'load_demo', title: 'Load Demo Data', desc: messages.confirm.loadDemoData })}
+      />
+    );
+  }
 
   const renderDailyView = () => {
     const dateKey = getSafeDateKey(currentDate);
@@ -303,6 +332,63 @@ export default function RosterDashboard({
 
   return (
     <div className="flex flex-col h-full min-h-0 space-y-5 animate-in fade-in duration-300">
+      {/* ─── Current Shift Header Bar ─────────────────────────────────── */}
+      {cs?.currentShift && (
+        <div className="shrink-0 bg-gradient-to-r from-brand-600 via-teal-600 to-brand-700 rounded-2xl p-4 text-white shadow-lg shadow-brand-600/20 flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+              <Clock size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Current Shift</p>
+              <p className="text-lg font-extrabold">{cs.currentShift.label}</p>
+            </div>
+          </div>
+
+          <div className="h-8 w-px bg-white/20 hidden md:block" />
+
+          <div className="flex items-center gap-2">
+            <Calendar size={14} className="text-white/70" />
+            <span className="text-sm font-semibold">{cs.currentShift.startTime} — {cs.currentShift.endTime}</span>
+          </div>
+
+          <div className="h-8 w-px bg-white/20 hidden md:block" />
+
+          {shiftTimeLeft && (
+            <div className="flex items-center gap-2">
+              <Timer size={14} className="text-white/70" />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Time Left</p>
+                <p className="text-lg font-extrabold font-mono tracking-wider">{shiftTimeLeft}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="h-8 w-px bg-white/20 hidden md:block" />
+
+          <div className="flex items-center gap-2">
+            <Users size={14} className="text-white/70" />
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Resources Available</p>
+              <p className="text-lg font-extrabold">{cs.availableResources ?? '—'} / {cs.totalEmployees ?? '—'}</p>
+            </div>
+          </div>
+
+          {cs.shiftLead && (
+            <>
+              <div className="h-8 w-px bg-white/20 hidden md:block" />
+              <div className="flex items-center gap-2">
+                <UserCheck size={14} className="text-white/70" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Shift Lead</p>
+                  <p className="text-sm font-bold">{cs.shiftLead}</p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {generationError && (
         <div className="shrink-0 p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-rose-700 shadow-sm">
           <AlertCircle className="shrink-0 mt-0.5" size={20} />

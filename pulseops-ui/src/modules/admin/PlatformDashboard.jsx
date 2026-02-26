@@ -1,73 +1,42 @@
 // ============================================================================
 // PlatformDashboard — PulseOps UI
 //
-// PURPOSE: Root orchestrator for the authenticated application. Manages
-// module switching, sidebar navigation, and view rendering. Fetches
-// enabled modules from the database (via /api/modules) to drive the
-// TopNav dynamically — disabled modules are hidden.
+// PURPOSE: GENERIC root orchestrator for the authenticated application.
+// Manages module switching, sidebar navigation, and view rendering.
+// Fetches enabled modules from the database (via /api/modules) and
+// MERGES them with static manifests from moduleRegistry.js.
 //
-// ARCHITECTURE: Thin orchestrator — delegates all view rendering to
-// dedicated view components. Module list is fetched from the DB on mount
-// and refreshed when modules are enabled/disabled. This ensures the
-// navigation survives Kubernetes pod restarts.
+// ARCHITECTURE: ZERO module-specific code lives here. All module data
+// (navItems, views, settingsTabs, icons) comes from each module's
+// manifest.js file. This component reads manifests generically.
+//
+// PLUG-AND-PLAY: Adding a new module requires ZERO changes to this file.
+// Just create a manifest.js in the module folder and register it in
+// moduleRegistry.js — this component discovers it automatically.
 //
 // USED BY:
 //   - App.jsx → renders when user is authenticated
 //
 // INTEGRATION FLOW:
 //   App.jsx authenticates → PlatformDashboard mounts →
-//   fetches modules from DB → builds TopNav + SideNav →
-//   renders active module view
+//   fetches modules from DB → merges with manifests →
+//   builds TopNav + SideNav → renders active module view
 // ============================================================================
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import {
-  LayoutDashboard, Users, ScrollText, Settings as SettingsIcon,
-  Database, Shield, Layers, Package, Calendar,
-  BarChart3, Sliders
-} from 'lucide-react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import AppShell from '@core/AppShell';
 import { SettingsConfig } from '@shared';
 import Logger from '@shared/services/logger';
 import ModuleService from '@shared/services/moduleService';
-import uiText from '@shared/config/uiElementsText.json';
 import appConfig from '@shared/config/app.json';
-import AdminOverview from '@modules/admin/views/AdminOverview';
-import ModulesPage from '@modules/admin/views/ModulesPage';
-import LogsViewer from '@modules/admin/views/LogsViewer';
-import SettingsDatabase from '@modules/admin/views/SettingsDatabase';
-import SettingsDbObjects from '@modules/admin/views/SettingsDbObjects';
-import SettingsAuth from '@modules/admin/views/SettingsAuth';
-import SettingsLogging from '@modules/admin/views/SettingsLogging';
-import ShiftRosterApp from '@modules/roster/ShiftRosterApp';
-
-const settingsTxt = uiText.platformAdmin.settings;
-
-const MODULE_ICON_MAP = {
-  platform_admin: Shield,
-  shiftroaster: Calendar,
-};
-
-const ADMIN_NAV_ITEMS = [
-  { id: 'overview', label: uiText.platformAdmin.navItems.overview, icon: LayoutDashboard },
-  { id: 'modules', label: uiText.platformAdmin.navItems.modules, icon: Package },
-  { id: 'users', label: uiText.platformAdmin.navItems.users, icon: Users },
-  { id: 'logs', label: uiText.platformAdmin.navItems.logs, icon: ScrollText },
-  { id: 'settings', label: uiText.platformAdmin.navItems.settings, icon: SettingsIcon },
-];
-
-const ROSTER_NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: Calendar },
-  { id: 'reports', label: 'Reports', icon: BarChart3 },
-  { id: 'config', label: 'Configuration', icon: Sliders },
-  { id: 'settings', label: 'Settings', icon: SettingsIcon },
-];
+import { getAllManifests, getManifestById } from '@modules/moduleRegistry';
 
 export default function PlatformDashboard({ user, onLogout }) {
   const [dbModules, setDbModules] = useState([]);
-  const [activeModuleId, setActiveModuleId] = useState('platform_admin');
-  const [activeView, setActiveView] = useState('overview');
+  const [activeModuleId, setActiveModuleId] = useState(null);
+  const [activeView, setActiveView] = useState(null);
 
-  // Fetch modules from database on mount
+  // ─── Fetch modules from database on mount ──────────────────────────────────
   const fetchModules = useCallback(async () => {
     try {
       const data = await ModuleService.getAll();
@@ -79,88 +48,126 @@ export default function PlatformDashboard({ user, onLogout }) {
 
   useEffect(() => { fetchModules(); }, [fetchModules]);
 
-  // Build TopNav module list — always include Admin, plus enabled DB modules
+  // ─── Merge DB state with static manifests ──────────────────────────────────
+  // Core modules (isCore=true) are always shown. Non-core modules appear only
+  // if the DB says they're enabled AND the user's role is allowed.
   const availableModules = useMemo(() => {
-    const adminModule = {
-      id: 'platform_admin',
-      name: 'Admin',
-      shortName: 'Admin',
-      description: 'Platform Administration',
-      icon: Shield,
-      roles: ['super_admin', 'admin'],
-      enabled: true,
-      order: 0,
-    };
+    const allManifests = getAllManifests();
 
-    const enabledDbModules = dbModules
-      .filter(m => m.enabled && m.moduleId !== 'platform_admin' && (m.roles || []).includes(user?.role || 'user'))
-      .sort((a, b) => (a.order || 0) - (b.order || 0))
-      .map(m => ({
-        id: m.moduleId,
-        name: m.name,
-        shortName: m.name,
-        description: m.description,
-        icon: MODULE_ICON_MAP[m.moduleId] || Package,
-        roles: m.roles,
-        enabled: m.enabled,
-        order: m.order || 99,
-      }));
+    return allManifests
+      .map(manifest => {
+        const dbEntry = dbModules.find(m => m.moduleId === manifest.id);
+        const isEnabled = manifest.isCore || (dbEntry?.enabled ?? manifest.enabled);
+        const roles = dbEntry?.roles || manifest.roles;
+        const userRole = user?.role || 'user';
+        const hasAccess = roles.includes(userRole) || roles.includes('admin') && userRole === 'super_admin';
 
-    return [adminModule, ...enabledDbModules];
+        return {
+          id: manifest.id,
+          name: dbEntry?.name || manifest.name,
+          shortName: manifest.shortName,
+          description: dbEntry?.description || manifest.description,
+          icon: manifest.icon,
+          roles,
+          enabled: isEnabled,
+          isCore: manifest.isCore,
+          order: dbEntry?.order ?? manifest.order,
+          hasAccess,
+        };
+      })
+      .filter(m => m.enabled && m.hasAccess)
+      .sort((a, b) => a.order - b.order);
   }, [dbModules, user?.role]);
 
-  // Get navItems for active module
-  const sideNavItems = useMemo(() => {
-    if (activeModuleId === 'platform_admin') return ADMIN_NAV_ITEMS;
-    if (activeModuleId === 'shiftroaster') return ROSTER_NAV_ITEMS;
-    return [];
+  // ─── Set initial active module and view on first load ──────────────────────
+  useEffect(() => {
+    if (availableModules.length > 0 && activeModuleId === null) {
+      const firstModule = availableModules[0];
+      const manifest = getManifestById(firstModule.id);
+      setActiveModuleId(firstModule.id);
+      setActiveView(manifest?.defaultView || 'overview');
+    }
+  }, [availableModules, activeModuleId]);
+
+  // ─── Get active manifest ───────────────────────────────────────────────────
+  const activeManifest = useMemo(() => {
+    return getManifestById(activeModuleId);
   }, [activeModuleId]);
 
+  // ─── SideNav items from active manifest ────────────────────────────────────
+  const sideNavItems = useMemo(() => {
+    return activeManifest?.navItems || [];
+  }, [activeManifest]);
+
+  // ─── Module switching — reads defaultView from manifest ────────────────────
   const handleSwitchModule = useCallback((moduleId) => {
+    const manifest = getManifestById(moduleId);
     setActiveModuleId(moduleId);
-    if (moduleId === 'platform_admin') {
-      setActiveView('overview');
-    } else if (moduleId === 'shiftroaster') {
-      setActiveView('dashboard');
-    }
+    setActiveView(manifest?.defaultView || 'overview');
   }, []);
 
   const handleSideNavSelect = useCallback((id) => {
     setActiveView(id);
   }, []);
 
-  const renderSettingsView = () => {
-    const tabs = [
-      { id: 'settings_db', label: settingsTxt.tabs.database, icon: Database, content: <SettingsDatabase /> },
-      { id: 'settings_objects', label: settingsTxt.tabs.dbObjects, icon: Layers, content: <SettingsDbObjects /> },
-      { id: 'settings_auth', label: settingsTxt.tabs.authentication, icon: Shield, content: <SettingsAuth /> },
-      { id: 'settings_logging', label: settingsTxt.tabs.logging, icon: ScrollText, content: <SettingsLogging /> },
-    ];
+  // ─── Generic SettingsConfig renderer (reused for settings + config views) ───
+  const renderTabsView = useCallback((getTabs, title, subtitle, icon, defaultTab) => {
+    if (!getTabs) return null;
+    const tabs = getTabs();
     return (
       <SettingsConfig
-        title={settingsTxt.pageTitle}
-        subtitle={settingsTxt.subtitle}
-        icon={SettingsIcon}
+        title={title}
+        subtitle={subtitle}
+        icon={icon || SettingsIcon}
         tabs={tabs}
-        defaultTab="settings_db"
+        defaultTab={defaultTab || tabs[0]?.id}
       />
     );
-  };
+  }, []);
 
-  const renderAdminView = () => {
-    switch (activeView) {
-      case 'overview': return <AdminOverview user={user} onNavigate={handleSideNavSelect} />;
-      case 'modules':  return <ModulesPage onModulesChanged={fetchModules} />;
-      case 'users':    return <UsersPlaceholder />;
-      case 'logs':     return <LogsViewer />;
-      case 'settings': return renderSettingsView();
-      default:         return <AdminOverview user={user} onNavigate={handleSideNavSelect} />;
+  // ─── Generic view renderer — reads views from manifest ─────────────────────
+  const renderModuleContent = useCallback(() => {
+    if (!activeManifest) return null;
+
+    // Settings view — uses shared SettingsConfig with manifest's settingsTabs
+    if (activeView === 'settings' && activeManifest.getSettingsTabs) {
+      return renderTabsView(
+        activeManifest.getSettingsTabs,
+        activeManifest.settingsTitle,
+        activeManifest.settingsSubtitle,
+        activeManifest.settingsIcon,
+        activeManifest.settingsDefaultTab,
+      );
     }
-  };
 
+    // Config view — uses shared SettingsConfig with manifest's configTabs
+    if (activeView === 'config' && activeManifest.getConfigTabs) {
+      return renderTabsView(
+        activeManifest.getConfigTabs,
+        activeManifest.configTitle,
+        activeManifest.configSubtitle,
+        activeManifest.configIcon,
+        activeManifest.configDefaultTab,
+      );
+    }
+
+    // Standard view map
+    if (activeManifest.getViews) {
+      const views = activeManifest.getViews({
+        user,
+        onNavigate: handleSideNavSelect,
+        fetchModules,
+      });
+      return views[activeView] || views[activeManifest.defaultView] || null;
+    }
+
+    return null;
+  }, [activeManifest, activeView, user, handleSideNavSelect, fetchModules, renderTabsView]);
+
+  // ─── Active module display name ────────────────────────────────────────────
   const activeModuleName = useMemo(() => {
     const mod = availableModules.find(m => m.id === activeModuleId);
-    return mod?.name || 'Admin';
+    return mod?.name || '';
   }, [availableModules, activeModuleId]);
 
   return (
@@ -178,25 +185,11 @@ export default function PlatformDashboard({ user, onLogout }) {
       onSelectSideNavItem={handleSideNavSelect}
       logger={Logger}
     >
-      {activeModuleId === 'shiftroaster' ? (
-        <ShiftRosterApp activeTab={activeView} onTabChange={setActiveView} />
-      ) : (
-        renderAdminView()
-      )}
+      {(() => {
+        const content = renderModuleContent();
+        const Wrapper = activeManifest?.ViewWrapper;
+        return Wrapper ? <Wrapper>{content}</Wrapper> : content;
+      })()}
     </AppShell>
-  );
-}
-
-function UsersPlaceholder() {
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="bg-white rounded-2xl border border-surface-200 shadow-sm p-8 flex flex-col items-center justify-center min-h-[400px]">
-        <Users size={48} className="text-surface-300 mb-4" />
-        <h3 className="text-xl font-bold text-surface-800 mb-2">User Management</h3>
-        <p className="text-surface-500 text-sm text-center max-w-md">
-          Full user CRUD operations with role assignment and status management.
-        </p>
-      </div>
-    </div>
   );
 }

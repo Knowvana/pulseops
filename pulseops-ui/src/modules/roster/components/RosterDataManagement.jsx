@@ -4,18 +4,20 @@
 // PURPOSE: Data management panel for the Shift Roster module.
 // Provides actions to load demo data, remove demo data, and perform hard reset.
 //
-// ARCHITECTURE: Module-specific component. Triggers confirmation actions
-// via onDataAction callback — the parent handles the actual logic.
+// ARCHITECTURE: Module-specific component. Consumes handleDataAction from
+// RosterContext via useRoster(). The context handles the actual logic.
 // ============================================================================
 import React, { useState } from 'react';
 import { Database, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { Logger } from '@shared';
 import uiText from '@shared/config/uiElementsText.json';
 import messages from '@shared/config/messages.json';
+import { useRoster } from '@modules/roster/context/RosterContext';
 
 const rosterTxt = uiText.shiftRoster?.dataManagement || {};
 
-export default function RosterDataManagement({ onDataAction }) {
+export default function RosterDataManagement() {
+  const { handleDataAction } = useRoster();
   const [expandedAction, setExpandedAction] = useState(null);
 
   const handleDataActionClick = (type) => {
@@ -38,7 +40,7 @@ export default function RosterDataManagement({ onDataAction }) {
     };
 
     Logger.info('RosterDataManagement', 'Data action initiated', { action: type });
-    onDataAction(actions[type]);
+    handleDataAction(actions[type]);
   };
 
   return (

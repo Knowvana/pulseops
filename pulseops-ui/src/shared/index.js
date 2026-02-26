@@ -31,7 +31,6 @@ export { default as TimePicker } from '@shared/components/TimePicker';
 export { default as StepWizard } from '@shared/components/wizards/StepWizard';
 
 // --- Layouts ---
-export { default as ModuleLayout } from '@shared/components/layouts/ModuleLayout';
 export { default as TopNav } from '@shared/components/layouts/TopNav';
 export { default as SideNav } from '@shared/components/layouts/SideNav';
 export { default as RightPanel } from '@shared/components/layouts/RightPanel';

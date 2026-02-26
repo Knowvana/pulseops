@@ -10,7 +10,7 @@ import messages from '@shared/config/messages.json';
 
 const txt = uiText.platformAdmin.settings.authentication;
 
-export default function SettingsAuth() {
+export default function AdminSettingsAuth() {
   const [authMethod, setAuthMethod] = useState('json');
   const [dbReady, setDbReady] = useState(false);
   const [dbInitialized, setDbInitialized] = useState(false);
@@ -36,7 +36,7 @@ export default function SettingsAuth() {
         setDbInitialized(schemaRes.data.initialized !== false && schemaRes.data.hasDefaultData !== false);
       }
     } catch (err) {
-      Logger.warn('Settings - Auth', 'Failed to check auth status', { error: err.message });
+      Logger.warn('AdminSettingsAuth', 'Failed to check auth status', { error: err.message });
     }
   }, []);
 
@@ -52,14 +52,14 @@ export default function SettingsAuth() {
       if (result?.success) {
         setAuthMethod(newMethod);
         setShowSuccess(true);
-        Logger.info('Settings - Auth', messages.success.authSwitched, { method: newMethod });
+        Logger.info('AdminSettingsAuth', messages.success.authSwitched, { method: newMethod });
       } else {
         throw new Error(result?.error?.message || messages.errors.authSwitchFailed);
       }
     } catch (err) {
       setErrorMessage(err.message);
       setShowError(true);
-      Logger.error('Settings - Auth', messages.errors.authSwitchFailed, { error: err.message });
+      Logger.error('AdminSettingsAuth', messages.errors.authSwitchFailed, { error: err.message });
     } finally {
       setIsSwitching(false);
     }
@@ -74,12 +74,10 @@ export default function SettingsAuth() {
         <p className="text-sm text-surface-400">{txt.description}</p>
       </div>
 
-      {/* Current Method */}
       <Card variant="flat" className="p-4">
         <h4 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-4">{txt.currentMethod}</h4>
 
         <div className="space-y-3">
-          {/* JSON Auth */}
           <div className={`p-4 rounded-xl border-2 transition-all ${
             authMethod === 'json'
               ? 'border-brand-300 bg-brand-50/30 shadow-sm'
@@ -97,7 +95,6 @@ export default function SettingsAuth() {
             <p className="text-xs text-surface-500">{txt.jsonDescription}</p>
           </div>
 
-          {/* Database Auth */}
           <div className={`p-4 rounded-xl border-2 transition-all ${
             authMethod === 'database'
               ? 'border-brand-300 bg-brand-50/30 shadow-sm'
@@ -117,7 +114,6 @@ export default function SettingsAuth() {
         </div>
       </Card>
 
-      {/* Switch Auth */}
       <Card variant="flat" className="p-4">
         <h4 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3">{txt.switchLabel}</h4>
 
@@ -135,7 +131,6 @@ export default function SettingsAuth() {
             icon={<Shield size={14} />}
             onClick={() => setShowConfirm(true)}
             disabled={!canSwitchToDb || isSwitching}
-            isLoading={isSwitching}
           >
             {isSwitching ? txt.switchingButton : txt.switchButton}
           </Button>
@@ -146,7 +141,6 @@ export default function SettingsAuth() {
             icon={<Shield size={14} />}
             onClick={() => setShowConfirm(true)}
             disabled={isSwitching}
-            isLoading={isSwitching}
           >
             Switch to JSON Auth
           </Button>

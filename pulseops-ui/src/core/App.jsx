@@ -14,7 +14,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AuthService, Logger, LoginForm, LoadingSpinner } from '@shared';
 import logsConfig from '@shared/config/logs.json';
 import PlatformDashboard from '@modules/admin/PlatformDashboard';
-import ShiftRosterApp from '@modules/roster/ShiftRosterApp';
 
 export default function App() {
   const [user, setUser] = useState(null);

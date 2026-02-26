@@ -1,41 +1,43 @@
 // ============================================================================
-// ShiftRosterApp — PulseOps UI (ShiftRoaster Module)
+// RosterContext — PulseOps UI (Roster Module)
 //
-// PURPOSE: Root component for the ShiftRoaster module. Manages all roster
-// state (employees, shifts, leaves, schedule) and orchestrates the
-// sub-components (Dashboard, Config, Reports, Settings). Includes a
-// current shift header bar showing live shift details.
+// PURPOSE: Centralized state management for the Shift Roster module.
+// Holds all shared state (shifts, employees, leaves, schedule, etc.)
+// so that every roster view/component can consume it via useRoster().
 //
-// ARCHITECTURE: Pure content component. Navigation is managed by parent
-// PlatformDashboard via activeTab/onTabChange props. Data is fetched
-// from the API (shiftroaster_* tables) and persisted to the database.
-// Settings view uses the universal SettingsConfig component.
+// ARCHITECTURE: React Context + Provider pattern. The manifest wraps
+// all roster views inside <RosterProvider>, and each view calls
+// useRoster() instead of receiving props from a monolithic parent.
+//
+// STATE OWNED:
+//   - shifts, employees, leaves (fetched from API on mount)
+//   - schedule, generationError (local generation state)
+//   - currentShiftInfo, shiftTimeLeft (live shift header)
+//   - viewMode, currentDate (navigation)
+//   - confirmAction, isProcessing, processSuccess (confirmation modal)
+//   - dataLoading (initial fetch indicator)
 //
 // USED BY:
-//   - PlatformDashboard.jsx → renders when activeModuleId === 'shiftroaster'
-//
-// INTEGRATION FLOW:
-//   PlatformDashboard switches to shiftroaster → ShiftRosterApp mounts →
-//   fetches current shift from API → renders header + active tab view
+//   - RosterDashboard, RosterReports, RosterConfig, RosterDataManagement
+//   - roster/manifest.jsx wraps views in <RosterProvider>
 // ============================================================================
-import React, { useState, useCallback, useEffect } from 'react';
-import {
-  Calendar, Settings as SettingsIcon, Clock, Users as UsersIcon,
-  UserCheck, Timer, Database, Trash2, Loader2
-} from 'lucide-react';
-import { ConfirmationModal, EmptyState, SettingsConfig, Logger, ApiClient, loadRosterDemo } from '@shared';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { ApiClient, ConfirmationModal, Logger } from '@shared';
 import logsConfig from '@shared/config/logs.json';
-import uiText from '@shared/config/uiElementsText.json';
-import messages from '@shared/config/messages.json';
 import urls from '@shared/config/urls.json';
-import RosterDashboard from '@modules/roster/components/RosterDashboard';
-import RosterReports from '@modules/roster/components/RosterReports';
-import RosterConfigPage from '@modules/roster/views/RosterConfigPage';
-import RosterSettingsPage from '@modules/roster/views/RosterSettingsPage';
+import messages from '@shared/config/messages.json';
 import RosterService from '@modules/roster/services/rosterService';
 import { generateRoster, getSafeDateKey } from '@modules/roster/utils/rosterUtils';
 
-export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange }) {
+const RosterContext = createContext(null);
+
+export function useRoster() {
+  const ctx = useContext(RosterContext);
+  if (!ctx) throw new Error('useRoster must be used inside <RosterProvider>');
+  return ctx;
+}
+
+export default function RosterProvider({ children }) {
   // --- Core Roster State ---
   const [employees, setEmployees] = useState([]);
   const [shifts, setShifts] = useState([]);
@@ -56,7 +58,7 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
   const [isProcessing, setIsProcessing] = useState(false);
   const [processSuccess, setProcessSuccess] = useState(false);
 
-  // --- Fetch roster data from API on mount ---
+  // --- Initial data fetch ---
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
@@ -188,8 +190,21 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
     URL.revokeObjectURL(url);
   }, [schedule, shifts, employees, currentDate]);
 
-  // --- Data Actions (load demo, delete all) ---
-  const handleDataAction = (action) => setConfirmAction(action);
+  // --- Refresh data from API (used after data actions) ---
+  const refreshData = useCallback(async () => {
+    const [shiftsRes, employeesRes, leavesRes] = await Promise.allSettled([
+      ApiClient.get(urls.rosterShiftsEndpoint),
+      ApiClient.get(urls.rosterEmployeesEndpoint),
+      ApiClient.get(urls.rosterLeavesEndpoint),
+    ]);
+    if (shiftsRes.status === 'fulfilled' && shiftsRes.value?.data) setShifts(shiftsRes.value.data);
+    if (employeesRes.status === 'fulfilled' && employeesRes.value?.data) setEmployees(employeesRes.value.data);
+    if (leavesRes.status === 'fulfilled' && leavesRes.value?.data) setLeaves(leavesRes.value.data);
+    setSchedule(null);
+  }, []);
+
+  // --- Data Actions (load demo, remove demo, hard reset) ---
+  const handleDataAction = useCallback((action) => setConfirmAction(action), []);
 
   const handleConfirm = useCallback(async () => {
     if (!confirmAction) return;
@@ -199,51 +214,24 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
       if (confirmAction.type === 'load_demo') {
         Logger.info('ShiftRoster', 'Loading demo data via API');
         const result = await RosterService.loadDemoData();
-        
         if (result.success) {
-          // Refresh data from API
-          const [shiftsRes, employeesRes, leavesRes] = await Promise.allSettled([
-            ApiClient.get(urls.rosterShiftsEndpoint),
-            ApiClient.get(urls.rosterEmployeesEndpoint),
-            ApiClient.get(urls.rosterLeavesEndpoint),
-          ]);
-          
-          if (shiftsRes.status === 'fulfilled' && shiftsRes.value?.data) setShifts(shiftsRes.value.data);
-          if (employeesRes.status === 'fulfilled' && employeesRes.value?.data) setEmployees(employeesRes.value.data);
-          if (leavesRes.status === 'fulfilled' && leavesRes.value?.data) setLeaves(leavesRes.value.data);
-          
-          setSchedule(null);
+          await refreshData();
           Logger.info('ShiftRoster', logsConfig.messages.roster.demoLoaded);
         } else {
-          Logger.error('ShiftRoster', 'Failed to load demo data', { error: result.error?.message });
           throw new Error(result.error?.message || 'Failed to load demo data');
         }
       } else if (confirmAction.type === 'remove_demo') {
         Logger.info('ShiftRoster', 'Removing demo data via API');
         const result = await RosterService.removeDemoData();
-        
         if (result.success) {
-          // Refresh data from API
-          const [shiftsRes, employeesRes, leavesRes] = await Promise.allSettled([
-            ApiClient.get(urls.rosterShiftsEndpoint),
-            ApiClient.get(urls.rosterEmployeesEndpoint),
-            ApiClient.get(urls.rosterLeavesEndpoint),
-          ]);
-          
-          if (shiftsRes.status === 'fulfilled' && shiftsRes.value?.data) setShifts(shiftsRes.value.data);
-          if (employeesRes.status === 'fulfilled' && employeesRes.value?.data) setEmployees(employeesRes.value.data);
-          if (leavesRes.status === 'fulfilled' && leavesRes.value?.data) setLeaves(leavesRes.value.data);
-          
-          setSchedule(null);
+          await refreshData();
           Logger.info('ShiftRoster', 'Demo data removed successfully');
         } else {
-          Logger.error('ShiftRoster', 'Failed to remove demo data', { error: result.error?.message });
           throw new Error(result.error?.message || 'Failed to remove demo data');
         }
       } else if (confirmAction.type === 'hard_reset') {
         Logger.warn('ShiftRoster', 'Performing hard reset of roster data');
         const result = await RosterService.hardResetRosterData();
-        
         if (result.success) {
           setEmployees([]);
           setShifts([]);
@@ -252,11 +240,10 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
           setGenerationError(null);
           Logger.info('ShiftRoster', 'Hard reset completed successfully');
         } else {
-          Logger.error('ShiftRoster', 'Failed to hard reset', { error: result.error?.message });
           throw new Error(result.error?.message || 'Failed to hard reset');
         }
       }
-      
+
       setIsProcessing(false);
       setProcessSuccess(true);
     } catch (err) {
@@ -265,13 +252,12 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
       setProcessSuccess(false);
       setConfirmAction(null);
     }
-  }, [confirmAction]);
+  }, [confirmAction, refreshData]);
 
   const handleSuccessClose = useCallback(() => {
     setConfirmAction(null);
     setProcessSuccess(false);
-    if (onTabChange) onTabChange('dashboard');
-  }, [onTabChange]);
+  }, []);
 
   const handleCancelAction = useCallback(() => {
     setConfirmAction(null);
@@ -280,146 +266,51 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
 
   const hasData = employees.length > 0 || shifts.length > 0;
 
-  // --- Render content based on active tab ---
-  const renderContent = () => {
-    if (dataLoading) {
-      return (
-        <div className="flex items-center justify-center min-h-[300px]">
-          <Loader2 className="animate-spin text-brand-500" size={32} />
-        </div>
-      );
-    }
+  // --- Context value ---
+  const value = useMemo(() => ({
+    // Core data
+    employees, setEmployees,
+    shifts, setShifts,
+    leaves, setLeaves,
+    schedule, setSchedule,
+    generationError,
+    dataLoading,
+    hasData,
 
-    if (!hasData && activeTab === 'dashboard') {
-      return (
-        <EmptyState
-          module="roster_planner"
-          onPrimaryAction={() => onTabChange?.('config')}
-          onSecondaryAction={() => handleDataAction({ type: 'load_demo', title: 'Load Demo Data', desc: messages.confirm.loadDemoData })}
-        />
-      );
-    }
+    // Current shift header
+    currentShiftInfo,
+    shiftTimeLeft,
 
-    switch (activeTab) {
-      case 'dashboard':
-        return (
-          <RosterDashboard
-            schedule={schedule}
-            employees={employees}
-            shifts={shifts}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            currentDate={currentDate}
-            navigateDate={navigateDate}
-            getDisplayDateRange={getDisplayDateRange}
-            handleGenerate={handleGenerate}
-            downloadCSV={downloadCSV}
-            generationError={generationError}
-            onUpdateSchedule={handleUpdateSchedule}
-          />
-        );
-      case 'reports':
-        return (
-          <RosterReports
-            schedule={schedule}
-            employees={employees}
-            shifts={shifts}
-            leaves={leaves}
-            currentDate={currentDate}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            navigateDate={navigateDate}
-            getDisplayDateRange={getDisplayDateRange}
-          />
-        );
-      case 'config':
-        return (
-          <RosterConfigPage
-            shifts={shifts}
-            setShifts={setShifts}
-            employees={employees}
-            setEmployees={setEmployees}
-            leaves={leaves}
-            setLeaves={setLeaves}
-            onDataAction={handleDataAction}
-          />
-        );
-      case 'settings':
-        return (
-          <RosterSettingsPage
-            onDataAction={handleDataAction}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+    // Navigation
+    viewMode, setViewMode,
+    currentDate, setCurrentDate,
+    navigateDate,
+    getDisplayDateRange,
 
-  const cs = currentShiftInfo;
+    // Actions
+    handleGenerate,
+    handleUpdateSchedule,
+    downloadCSV,
+    handleDataAction,
+
+    // Confirmation modal
+    confirmAction,
+    isProcessing,
+    processSuccess,
+    handleConfirm,
+    handleSuccessClose,
+    handleCancelAction,
+  }), [
+    employees, shifts, leaves, schedule, generationError, dataLoading, hasData,
+    currentShiftInfo, shiftTimeLeft,
+    viewMode, currentDate, navigateDate, getDisplayDateRange,
+    handleGenerate, handleUpdateSchedule, downloadCSV, handleDataAction,
+    confirmAction, isProcessing, processSuccess, handleConfirm, handleSuccessClose, handleCancelAction,
+  ]);
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      {/* ─── Current Shift Header Bar ─────────────────────────────────── */}
-      {cs?.currentShift && (
-        <div className="bg-gradient-to-r from-brand-600 via-teal-600 to-brand-700 rounded-2xl p-4 text-white shadow-lg shadow-brand-600/20 flex flex-wrap items-center gap-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-              <Clock size={20} />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Current Shift</p>
-              <p className="text-lg font-extrabold">{cs.currentShift.label}</p>
-            </div>
-          </div>
-
-          <div className="h-8 w-px bg-white/20 hidden md:block" />
-
-          <div className="flex items-center gap-2">
-            <Calendar size={14} className="text-white/70" />
-            <span className="text-sm font-semibold">{cs.currentShift.startTime} — {cs.currentShift.endTime}</span>
-          </div>
-
-          <div className="h-8 w-px bg-white/20 hidden md:block" />
-
-          {shiftTimeLeft && (
-            <div className="flex items-center gap-2">
-              <Timer size={14} className="text-white/70" />
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Time Left</p>
-                <p className="text-lg font-extrabold font-mono tracking-wider">{shiftTimeLeft}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="h-8 w-px bg-white/20 hidden md:block" />
-
-          <div className="flex items-center gap-2">
-            <UsersIcon size={14} className="text-white/70" />
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Resources Available</p>
-              <p className="text-lg font-extrabold">{cs.availableResources ?? '—'} / {cs.totalEmployees ?? '—'}</p>
-            </div>
-          </div>
-
-          {cs.shiftLead && (
-            <>
-              <div className="h-8 w-px bg-white/20 hidden md:block" />
-              <div className="flex items-center gap-2">
-                <UserCheck size={14} className="text-white/70" />
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Shift Lead</p>
-                  <p className="text-sm font-bold">{cs.shiftLead}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ─── Active Tab Content ───────────────────────────────────────── */}
-      {renderContent()}
-
-      {/* Confirmation Modal Overlay */}
+    <RosterContext.Provider value={value}>
+      {children}
       <ConfirmationModal
         action={confirmAction}
         isProcessing={isProcessing}
@@ -428,6 +319,6 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
         onCancel={handleCancelAction}
         onSuccessClose={handleSuccessClose}
       />
-    </div>
+    </RosterContext.Provider>
   );
 }

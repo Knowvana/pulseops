@@ -30,7 +30,7 @@ function EditableField({ label, value, onChange, placeholder, disabled, type = '
   );
 }
 
-export default function SettingsDatabase() {
+export default function AdminSettingsDatabase() {
   const [dbConfig, setDbConfig] = useState({
     host: 'localhost',
     port: '5432',
@@ -40,10 +40,9 @@ export default function SettingsDatabase() {
     ssl: false,
   });
 
-  // Unified status state for both Test Connect and Save Config
   const [unifiedStatus, setUnifiedStatus] = useState({
-    type: null, // 'connection' | 'save' | null
-    status: 'neutral', // 'success' | 'error' | 'neutral'
+    type: null,
+    status: 'neutral',
     message: '',
     meta: null,
   });
@@ -53,7 +52,6 @@ export default function SettingsDatabase() {
   const [saveProgress, setSaveProgress] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Auto-check connection status on mount
   useEffect(() => {
     const checkConnectionOnLoad = async () => {
       try {
@@ -61,23 +59,18 @@ export default function SettingsDatabase() {
         if (result?.success) {
           const latency = result.data?.latencyMs || 0;
           const dbVersion = result.data?.dbVersion || null;
-          const dbSystemTime = result.data?.dbSystemTime || null;
           const versionShort = dbVersion ? dbVersion.split(',')[0].replace('PostgreSQL ', '') : 'Unknown';
-          const systemTime = dbSystemTime ? new Date(dbSystemTime).toLocaleString('en-US', {
-            year: 'numeric', month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
-          }) : 'Unknown';
           setUnifiedStatus({
             type: 'connection',
             status: 'success',
             message: result.data?.message || messages.success.dbConnected,
-            meta: `Response Time: ${latency}ms • Database Version: ${versionShort} • Database System Time: ${systemTime}`,
+            meta: `Response Time: ${latency}ms • Database Version: ${versionShort}`,
           });
         } else {
           setUnifiedStatus({
             type: 'connection',
             status: 'error',
-            message: result?.data?.message || result?.error?.message || messages.errors.dbConnectionFailed,
+            message: result?.data?.message || messages.errors.dbConnectionFailed,
             meta: null,
           });
         }
@@ -105,38 +98,23 @@ export default function SettingsDatabase() {
       if (result?.success) {
         const latency = result.data?.latencyMs || 0;
         const dbVersion = result.data?.dbVersion || null;
-        const dbSystemTime = result.data?.dbSystemTime || null;
-        
-        // Format database version (extract short version)
         const versionShort = dbVersion ? dbVersion.split(',')[0].replace('PostgreSQL ', '') : 'Unknown';
-        
-        // Format system time (extract date and time)
-        const systemTime = dbSystemTime ? new Date(dbSystemTime).toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        }) : 'Unknown';
         
         setUnifiedStatus({
           type: 'connection',
           status: 'success',
           message: result.data?.message || messages.success.dbConnected,
-          meta: `Response Time: ${latency}ms • Database Version: ${versionShort} • Database System Time: ${systemTime}`,
+          meta: `Response Time: ${latency}ms • Database Version: ${versionShort}`,
         });
-        Logger.info('Settings - Database', result.data?.message || messages.success.dbConnected, { latencyMs: latency, dbVersion, dbSystemTime });
+        Logger.info('AdminSettingsDatabase', result.data?.message || messages.success.dbConnected, { latencyMs: latency });
       } else {
         setUnifiedStatus({
           type: 'connection',
           status: 'error',
-          message: result?.data?.message || result?.error?.message || messages.errors.dbConnectionFailed,
+          message: result?.error?.message || messages.errors.dbConnectionFailed,
           meta: null,
         });
-        Logger.warn('Settings - Database', messages.errors.dbConnectionFailed, { error: result?.error?.message });
       }
-      setTestProgress(100);
     } catch (err) {
       setUnifiedStatus({
         type: 'connection',
@@ -144,55 +122,44 @@ export default function SettingsDatabase() {
         message: err.message || messages.errors.dbConnectionFailed,
         meta: null,
       });
-      Logger.error('Settings - Database', messages.errors.dbConnectionFailed, { error: err.message });
     } finally {
-      setTimeout(() => { setIsTesting(false); setTestProgress(0); }, 300);
+      setIsTesting(false);
+      setTimeout(() => setTestProgress(0), 300);
     }
   }, []);
 
   const handleSaveConfig = useCallback(async () => {
     setIsSaving(true);
     setSaveProgress(10);
-    setUnifiedStatus({ type: null, status: 'neutral', message: '', meta: null });
     try {
       setSaveProgress(40);
-      const payload = {
-        host: dbConfig.host,
-        port: parseInt(dbConfig.port) || 5432,
-        database: dbConfig.database,
-        username: dbConfig.username,
-        ssl: dbConfig.ssl,
-      };
-      if (dbConfig.password) {
-        payload.password = dbConfig.password;
-      }
-
-      const result = await ApiClient.post(urls.configEndpoint + '/database', payload);
+      const payload = { ...dbConfig };
+      const result = await ApiClient.post(urls.databaseConfigEndpoint, payload);
       setSaveProgress(90);
 
       if (result?.success) {
         setSaveProgress(100);
-        setIsSaving(false);
-        setDbConfig(prev => ({ ...prev, password: '' }));
         setUnifiedStatus({
           type: 'save',
           status: 'success',
           message: result.data?.message || messages.success.configSaved,
           meta: null,
         });
-        Logger.info('Settings - Database', messages.success.configSaved, payload);
+        Logger.info('AdminSettingsDatabase', messages.success.configSaved, payload);
       } else {
         throw new Error(result?.error?.message || messages.errors.configSaveFailed);
       }
     } catch (err) {
-      setIsSaving(false);
       setUnifiedStatus({
         type: 'save',
         status: 'error',
         message: err.message || messages.errors.configSaveFailed,
         meta: null,
       });
-      Logger.error('Settings - Database', messages.errors.configSaveFailed, { error: err.message });
+      Logger.error('AdminSettingsDatabase', messages.errors.configSaveFailed, { error: err.message });
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveProgress(0), 300);
     }
   }, [dbConfig]);
 
@@ -203,7 +170,6 @@ export default function SettingsDatabase() {
         <p className="text-sm text-surface-400">{txt.description}</p>
       </div>
 
-      {/* Database Type Banner */}
       <Card variant="flat" className="p-4">
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-brand-50 to-teal-50 border border-brand-200/50 mb-4">
           <div className="p-2 rounded-lg bg-white shadow-sm">
@@ -215,7 +181,6 @@ export default function SettingsDatabase() {
           </div>
         </div>
 
-        {/* Connection Form */}
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <EditableField label={txt.fields.host} value={dbConfig.host} onChange={(v) => setDbConfig(p => ({ ...p, host: v }))} placeholder={txt.placeholders.host} />
@@ -234,7 +199,6 @@ export default function SettingsDatabase() {
                 type="button"
                 onClick={() => setShowPassword(p => !p)}
                 className="text-surface-400 hover:text-surface-600 transition-colors"
-                title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
@@ -253,7 +217,6 @@ export default function SettingsDatabase() {
 
         <div className="h-px bg-gradient-to-r from-transparent via-surface-200 to-transparent my-4" />
 
-        {/* Unified Status Display */}
         {unifiedStatus.type && (
           <div className="mb-4">
             <StatusTile
@@ -272,13 +235,12 @@ export default function SettingsDatabase() {
           </div>
         )}
 
-        {/* Buttons */}
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />} onClick={handleTestConnect} disabled={isTesting}>
-            {isTesting ? txt.buttons.testing : txt.buttons.testConnect}
+            {isTesting ? 'Testing...' : 'Test Connection'}
           </Button>
           <Button variant="primary" size="sm" icon={<Save size={14} />} onClick={handleSaveConfig} disabled={isSaving}>
-            {isSaving ? txt.buttons.saving : txt.buttons.saveConfig}
+            {isSaving ? 'Saving...' : 'Save Configuration'}
           </Button>
         </div>
       </Card>

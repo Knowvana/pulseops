@@ -4,12 +4,12 @@
 // PURPOSE: Configuration panel for the Shift Roster module. Allows users
 // to manage shift parameters (capacity requirements), planned leaves,
 // and the employee resource pool. Supports conditional rendering for
-// different configuration sections.
+// different configuration sections via showOnly* props.
 //
-// ARCHITECTURE: Module-specific component. Uses roster constants for
-// color palette. All form state is local to this component — parent
-// only receives the final state updates via setter props. Shift form
-// is displayed in a modal dialog using the shared Modal component.
+// ARCHITECTURE: Module-specific component. Consumes shared roster state
+// from RosterContext via useRoster(). Uses roster constants for color
+// palette. All form state is local to this component. Shift form is
+// displayed in a modal dialog using the shared Modal component.
 // ============================================================================
 import React, { useState, useRef } from 'react';
 import { Trash2, Plus, CalendarX2, Users, Clock, Edit, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
@@ -18,6 +18,7 @@ import { COLORS } from '@modules/roster/utils/rosterConstants';
 import RosterService from '@modules/roster/services/rosterService';
 import uiText from '@shared/config/uiElementsText.json';
 import messages from '@shared/config/messages.json';
+import { useRoster } from '@modules/roster/context/RosterContext';
 
 const rosterTxt = uiText.shiftRoster?.config || {};
 
@@ -28,16 +29,15 @@ const ShiftBadge = ({ shift, className = '' }) => (
 );
 
 export default function RosterConfig({
-  shifts = [],
-  setShifts,
-  employees = [],
-  setEmployees,
-  leaves = [],
-  setLeaves,
   showOnlyShifts = false,
   showOnlyResourcePool = false,
   showOnlyLeaves = false,
 }) {
+  const {
+    shifts, setShifts,
+    employees, setEmployees,
+    leaves, setLeaves,
+  } = useRoster();
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [newShift, setNewShift] = useState({ label: '', time: '', color: COLORS[0].value, reqWeekday: 0, reqWeekend: 0 });
   const [newLeave, setNewLeave] = useState({ empId: '', date: '' });

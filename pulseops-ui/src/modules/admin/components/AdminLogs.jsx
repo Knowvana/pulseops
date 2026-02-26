@@ -8,7 +8,6 @@ import Button from '@shared/components/Button';
 import PageHeader from '@shared/components/PageHeader';
 import Logger from '@shared/services/logger';
 import ApiClient from '@shared/services/apiClient';
-import { sanitizeData, formatSanitizedJson } from '@shared/utils/logSanitizer';
 import uiText from '@shared/config/uiElementsText.json';
 
 const txt = uiText.platformAdmin.logs;
@@ -51,7 +50,6 @@ const API_COLUMNS = [
   { id: 'synced', label: txt.columns.synced, width: 60 },
 ];
 
-// Database logs use same columns as API logs
 const DB_LOGS_COLUMNS = API_COLUMNS;
 
 const SCROLLBAR_CSS = `
@@ -100,8 +98,7 @@ function getSortValue(log, colId, tab) {
   }
 }
 
-
-export default function LogsViewer() {
+export default function AdminLogs() {
   const [activeTab, setActiveTab] = useState('system');
   const [logs, setLogs] = useState([]);
   const [apiLogs, setApiLogs] = useState([]);
@@ -125,7 +122,6 @@ export default function LogsViewer() {
     try {
       const response = await ApiClient.get('/logs/database?limit=500');
       if (response.success && response.data?.logs) {
-        // Transform database logs to API log format
         const transformedLogs = response.data.logs.map(log => ({
           id: log.id,
           timestamp: log.timestamp,
@@ -138,12 +134,12 @@ export default function LogsViewer() {
           requestPayload: log.requestBody || null,
           responsePayload: log.responseBody || null,
           user: log.userEmail || 'system',
-          synced: true, // Database logs are already synced
+          synced: true,
         }));
         setDbLogs(transformedLogs);
       }
     } catch (err) {
-      Logger.error('LogsViewer', 'Failed to load database logs', { error: err.message });
+      Logger.error('AdminLogs', 'Failed to load database logs', { error: err.message });
     } finally {
       setIsLoadingDbLogs(false);
     }
@@ -169,7 +165,7 @@ export default function LogsViewer() {
       if (searchText) {
         const q = searchText.toLowerCase();
         const searchable = activeTab === 'system'
-          ? `${log.message} ${log.source} ${log.user || ''} ${log.result || ''}`
+          ? `${log.message} ${log.source} ${log.user || ''} ${log.result || ''}` 
           : `${log.method} ${log.url} ${log.user || ''} ${log.statusCode}`;
         return searchable.toLowerCase().includes(q);
       }
@@ -395,7 +391,7 @@ export default function LogsViewer() {
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.requestBody}</p>
             <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar whitespace-pre-wrap break-words">
-              {formatSanitizedJson(selectedLog.requestPayload)}
+              {JSON.stringify(selectedLog.requestPayload, null, 2)}
             </pre>
           </div>
         )}
@@ -403,7 +399,7 @@ export default function LogsViewer() {
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.responseBody}</p>
             <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar whitespace-pre-wrap break-words">
-              {formatSanitizedJson(selectedLog.responsePayload)}
+              {JSON.stringify(selectedLog.responsePayload, null, 2)}
             </pre>
           </div>
         )}
@@ -411,7 +407,7 @@ export default function LogsViewer() {
           <div>
             <p className="text-[10px] font-bold text-surface-400 uppercase mb-1">{txt.detail.fields.data}</p>
             <pre className="text-[10px] text-surface-600 bg-surface-50 rounded-lg p-3 overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words">
-              {typeof selectedLog.data === 'string' ? selectedLog.data : formatSanitizedJson(selectedLog.data)}
+              {typeof selectedLog.data === 'string' ? selectedLog.data : JSON.stringify(selectedLog.data, null, 2)}
             </pre>
           </div>
         )}
@@ -515,7 +511,7 @@ export default function LogsViewer() {
                   className={`px-2 py-1.5 rounded-md text-xs font-semibold transition-all capitalize ${
                     levelFilter === level
                       ? level === 'all' ? 'bg-brand-100 text-brand-700 ring-1 ring-brand-300'
-                        : `${LEVEL_CONFIG[level]?.bg} ${LEVEL_CONFIG[level]?.color} ring-1 ring-current/20`
+                        : `${LEVEL_CONFIG[level]?.bg} ${LEVEL_CONFIG[level]?.color} ring-1 ring-current/20` 
                       : 'bg-surface-50 text-surface-400 hover:bg-surface-100'
                   }`}
                 >

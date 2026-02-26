@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import { Settings, Save, CheckCircle2, Monitor, Server, Eye, Package, Check, Bug, Info, AlertTriangle, AlertCircle } from 'lucide-react';
 import Card from '@shared/components/Card';
 import Button from '@shared/components/Button';
-import PageHeader from '@shared/components/PageHeader';
 import Logger from '@shared/services/logger';
 import ApiClient from '@shared/services/apiClient';
 import uiText from '@shared/config/uiElementsText.json';
@@ -29,7 +28,7 @@ function ToggleRow({ label, description, enabled, onToggle, icon: Icon }) {
   );
 }
 
-export default function SettingsLogging() {
+export default function AdminSettingsLogging() {
   const currentConfig = Logger.getConfig();
 
   const [logLevel, setLogLevel] = useState(currentConfig.minLevel || 'debug');
@@ -78,7 +77,7 @@ export default function SettingsLogging() {
         autoCleanup,
         moduleLogging: moduleLogging.reduce((acc, m) => { acc[m.id] = m.enabled; return acc; }, {}),
       });
-      Logger.info('Settings - Logging', messages.success.logConfigSaved);
+      Logger.info('AdminSettingsLogging', messages.success.logConfigSaved);
       setStatus({
         type: 'save',
         status: 'success',
@@ -86,7 +85,7 @@ export default function SettingsLogging() {
         meta: null,
       });
     } catch (err) {
-      Logger.warn('Settings - Logging', 'Failed to persist logging config to server', { error: err.message });
+      Logger.warn('AdminSettingsLogging', 'Failed to persist logging config to server', { error: err.message });
     } finally {
       setIsSaving(false);
     }
@@ -99,11 +98,8 @@ export default function SettingsLogging() {
         <p className="text-sm text-surface-400">{txt.description}</p>
       </div>
 
-      {/* Logging Configuration */}
       <Card variant="flat" className="p-4">
         <div className="flex gap-6">
-          
-          {/* Log Level */}
           <div className="flex-[4]">
             <h5 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3 text-center">{txt.logLevel.title}</h5>
             <p className="text-xs text-surface-500 mb-3 text-center">{txt.logLevel.description}</p>
@@ -122,18 +118,10 @@ export default function SettingsLogging() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-surface-400 mt-1">
-              {logLevel === 'debug' && 'Captures all logs including debug, info, warn, and error messages.'}
-              {logLevel === 'info' && 'Captures info, warn, and error logs (excludes debug).'}
-              {logLevel === 'warn' && 'Captures warn and error logs (excludes debug and info).'}
-              {logLevel === 'error' && 'Captures only error logs (excludes debug, info, and warn).'}
-            </p>
           </div>
 
-          {/* Separator */}
           <div className="w-1 bg-gradient-to-b from-transparent via-purple-400 to-transparent shadow-lg" />
 
-          {/* Capture Options */}
           <div className="flex-[6] text-center">
             <h5 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3">Log Capture Options</h5>
             <div className="flex justify-center gap-2">
@@ -149,13 +137,10 @@ export default function SettingsLogging() {
         </div>
       </Card>
 
-      {/* Log Management */}
       <Card variant="flat" className="p-4">
         <h4 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3 text-center">Log Management</h4>
         <div className="h-px bg-gradient-to-r from-transparent via-purple-400 to-transparent mb-6"></div>
         <div className="flex gap-6">
-          
-          {/* Log Sync to Database */}
           <div className="flex-1">
             <h5 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3">{txt.sync.title}</h5>
             <div className="space-y-4">
@@ -175,10 +160,8 @@ export default function SettingsLogging() {
             </div>
           </div>
 
-          {/* Separator */}
           <div className="w-1 bg-gradient-to-b from-transparent via-purple-400 to-transparent shadow-lg" />
 
-          {/* Retention */}
           <div className="flex-1">
             <h5 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3">{txt.retention.title}</h5>
             <div className="space-y-4">
@@ -207,26 +190,11 @@ export default function SettingsLogging() {
                 />
                 <p className="text-xs text-surface-400 mt-1">{txt.retention.maxEntriesDescription}</p>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-surface-600 mb-1">{txt.retention.dbRetention}</label>
-                <input
-                  type="number"
-                  value={dbRetention}
-                  onChange={(e) => setDbRetention(Math.max(1000, parseInt(e.target.value) || 1000))}
-                  min={1000}
-                  max={100000}
-                  step={1000}
-                  className="w-full px-3 py-2 text-sm border border-surface-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
-                />
-                <p className="text-xs text-surface-400 mt-1">{txt.retention.dbRetentionDescription}</p>
-              </div>
             </div>
           </div>
 
-          {/* Separator */}
           <div className="w-1 bg-gradient-to-b from-transparent via-purple-400 to-transparent shadow-lg" />
 
-          {/* Module-wise Logging */}
           <div className="flex-1">
             <h5 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3">{txt.modulewise.title}</h5>
             <p className="text-xs text-surface-500 mb-3">{txt.modulewise.description}</p>
@@ -247,7 +215,6 @@ export default function SettingsLogging() {
         </div>
       </Card>
 
-      {/* Save Status */}
       {status.type && (
         <div className="mb-4">
           <StatusTile
@@ -260,7 +227,6 @@ export default function SettingsLogging() {
         </div>
       )}
 
-      {/* Save Button */}
       <div className="flex items-center gap-3">
         <Button
           variant="primary"

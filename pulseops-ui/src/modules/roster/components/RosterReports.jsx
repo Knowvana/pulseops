@@ -5,8 +5,8 @@
 // Displays per-employee timeline, shift counts, days worked, offs, and leaves
 // in a rich data table with color-coded status cells.
 //
-// ARCHITECTURE: Module-specific component. Pure view — no side effects.
-// Receives schedule, employees, shifts, leaves, and view state as props.
+// ARCHITECTURE: Module-specific component. Consumes shared roster state
+// from RosterContext via useRoster(). Pure view — no side effects.
 // ============================================================================
 import React from 'react';
 import {
@@ -15,11 +15,13 @@ import {
 } from 'lucide-react';
 import { getSafeDateKey } from '@modules/roster/utils/rosterUtils';
 import { WEEKDAYS } from '@modules/roster/utils/rosterConstants';
+import { useRoster } from '@modules/roster/context/RosterContext';
 
-export default function RosterReports({
-  schedule, employees, shifts, leaves, currentDate,
-  viewMode, setViewMode, navigateDate, getDisplayDateRange
-}) {
+export default function RosterReports() {
+  const {
+    schedule, employees, shifts, leaves, currentDate,
+    viewMode, setViewMode, navigateDate, getDisplayDateRange,
+  } = useRoster();
   if (!schedule) {
     return (
       <div className="text-center py-24 bg-white rounded-2xl border-2 border-surface-200 border-dashed h-full flex flex-col items-center justify-center">
