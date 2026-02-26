@@ -4,6 +4,12 @@
   "private": true,
   "description": "PulseOps — Enterprise Operations Management API. Standalone Kubernetes-ready Express backend with Sequelize ORM.",
   "type": "module",
+  "imports": {
+    "#core/*": "./src/core/*",
+    "#modules/*": "./src/modules/*",
+    "#config/*": "./src/config/*",
+    "#shared/*": "./src/shared/*"
+  },
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",

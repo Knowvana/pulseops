@@ -30,9 +30,9 @@
 //   POST /enable → module appears in TopNav
 // ============================================================================
 import { Router } from 'express';
-import { authenticate, authorize } from '../middleware/auth.js';
-import { SystemModule } from '../database/models/index.js';
-import logger, { msg, logMessages } from '../logger.js';
+import { authenticate, authorize } from '#core/middleware/auth.js';
+import { SystemModule } from '#core/database/models/index.js';
+import logger, { msg, logMessages } from '#core/logger.js';
 
 const router = Router();
 

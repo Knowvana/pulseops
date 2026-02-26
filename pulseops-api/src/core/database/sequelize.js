@@ -9,10 +9,10 @@
 // ============================================================================
 import { Sequelize } from 'sequelize';
 import { createRequire } from 'module';
-import logger, { msg, logMessages } from '../logger.js';
+import logger, { msg, logMessages } from '#core/logger.js';
 
 const require = createRequire(import.meta.url);
-const dbConfig = require('../../config/database.json');
+const dbConfig = require('#config/database.json');
 
 const sequelize = new Sequelize(
   process.env.DB_NAME || dbConfig.database,

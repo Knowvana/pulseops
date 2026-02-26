@@ -10,8 +10,8 @@
 //   GET /api/health/readiness — K8s readiness probe (includes DB check)
 // ============================================================================
 import { Router } from 'express';
-import { testConnection } from '../database/sequelize.js';
-import logger, { logMessages } from '../logger.js';
+import { testConnection } from '#core/database/sequelize.js';
+import logger, { logMessages } from '#core/logger.js';
 
 const router = Router();
 

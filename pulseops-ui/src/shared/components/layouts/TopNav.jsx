@@ -57,14 +57,7 @@ export default function TopNav({
                 {modules.map((mod, index) => {
                   const isActive = mod.id === activeModuleId;
                   const isLast = index === modules.length - 1;
-                  // Map module IDs to lucide icons
-                  const getModuleIcon = (id) => {
-                    switch(id) {
-                      case 'platform_admin': return <Settings size={18} className={`mr-2.5 transition-colors ${isActive ? 'text-brand-600' : 'text-surface-400 group-hover:text-brand-500'}`} />;
-                      case 'shift_roster': return <UserPlus size={18} className={`mr-2.5 transition-colors ${isActive ? 'text-brand-600' : 'text-surface-400 group-hover:text-brand-500'}`} />;
-                      default: return <MonitorDot size={18} className={`mr-2.5 transition-colors ${isActive ? 'text-brand-600' : 'text-surface-400 group-hover:text-brand-500'}`} />;
-                    }
-                  };
+                  const ModIcon = mod.icon || MonitorDot;
 
                   return (
                     <React.Fragment key={mod.id}>
@@ -78,7 +71,7 @@ export default function TopNav({
                           }
                         `}
                       >
-                        {getModuleIcon(mod.id)}
+                        <ModIcon size={18} className={`mr-2.5 transition-colors ${isActive ? 'text-brand-600' : 'text-surface-400 group-hover:text-brand-500'}`} />
                         {mod.name}
                         
                         {/* Bottom Gradient Border Highlighter */}

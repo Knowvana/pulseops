@@ -11,7 +11,7 @@ import winston from 'winston';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const logsConfig = require('../config/logs.json');
+const logsConfig = require('#config/logs.json');
 
 const logger = winston.createLogger({
   level: logsConfig.config.level || 'info',

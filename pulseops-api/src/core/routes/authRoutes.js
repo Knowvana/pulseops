@@ -13,13 +13,13 @@ import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { createRequire } from 'module';
-import { User } from '../database/models/index.js';
-import { authenticate } from '../middleware/auth.js';
-import logger, { msg, logMessages } from '../logger.js';
+import { User } from '#core/database/models/index.js';
+import { authenticate } from '#core/middleware/auth.js';
+import logger, { msg, logMessages } from '#core/logger.js';
 
 const require = createRequire(import.meta.url);
-const appConfig = require('../../config/app.json');
-const defaultUsers = require('../../config/defaultUsers.json');
+const appConfig = require('#config/app.json');
+const defaultUsers = require('#config/defaultUsers.json');
 
 const router = Router();
 

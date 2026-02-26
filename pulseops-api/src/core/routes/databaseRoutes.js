@@ -2,27 +2,56 @@
 // Database Routes — PulseOps API
 //
 // PURPOSE: Database management endpoints for admin users. Includes
-// connection testing, schema status, sync, stats, data seeding, and wipe.
+// connection testing, schema status, sync (core tables only), stats,
+// data seeding, and wipe (DROP ALL tables).
 //
 // ENDPOINTS:
 //   GET  /api/database/test-connection  — Test DB connectivity
 //   GET  /api/database/schema-status    — Check if schema is initialized
-//   POST /api/database/create-schema    — Sync all models (create tables)
+//   POST /api/database/create-schema    — Create CORE system_* tables only
+//   POST /api/database/sync             — Alias for create-schema
 //   GET  /api/database/stats            — Table and row counts
-//   POST /api/database/load-demo-data   — Seed demo data
-//   POST /api/database/wipe             — Delete all data (destructive)
+//   POST /api/database/load-default-data — Seed default admin user
+//   POST /api/database/load-demo-data   — Seed demo users
+//   POST /api/database/wipe             — DROP ALL tables (destructive)
+//   GET  /api/database/schema-info      — Get details of what will be created
+//   GET  /api/database/default-data-info — Get details of default data
 // ============================================================================
 import { Router } from 'express';
-import sequelize, { testConnection } from '../database/sequelize.js';
-import models, { User, SystemConfig, SystemModule, RosterSchedule, RosterConfig } from '../database/models/index.js';
-import { authenticate, authorize } from '../middleware/auth.js';
-import logger, { logMessages } from '../logger.js';
+import sequelize, { testConnection } from '#core/database/sequelize.js';
+import models, {
+  User, SystemConfig, SystemLog, SystemModule,
+} from '#core/database/models/index.js';
+import { authenticate, authorize } from '#core/middleware/auth.js';
+import logger, { logMessages } from '#core/logger.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const appConfig = require('../../config/app.json');
+const appConfig = require('#config/app.json');
 
 const router = Router();
+
+// Core system models — ONLY these are synced via Initialize Database
+const CORE_MODELS = [
+  { model: User, tableName: 'system_users', description: 'Platform users with roles and bcrypt passwords' },
+  { model: SystemConfig, tableName: 'system_config', description: 'Key-value configuration store' },
+  { model: SystemLog, tableName: 'system_logs', description: 'System and API log entries' },
+  { model: SystemModule, tableName: 'system_modules', description: 'Module registry and state' },
+];
+
+/**
+ * Helper: Get column info for a Sequelize model.
+ */
+function getModelColumns(model) {
+  const attrs = model.rawAttributes || {};
+  return Object.entries(attrs).map(([name, def]) => ({
+    name,
+    type: def.type?.key || def.type?.constructor?.name || 'UNKNOWN',
+    allowNull: def.allowNull !== false,
+    primaryKey: !!def.primaryKey,
+    defaultValue: def.defaultValue !== undefined ? String(def.defaultValue) : null,
+  }));
+}
 
 /**
  * @swagger
@@ -64,11 +93,30 @@ router.get('/test-connection', authenticate, authorize('admin'), async (req, res
  */
 router.get('/schema-status', authenticate, authorize('admin'), async (req, res, next) => {
   try {
+    // First test connection
+    const connTest = await testConnection();
+    if (!connTest.success) {
+      return res.json({
+        success: true,
+        data: {
+          connected: false,
+          initialized: false,
+          tables: [],
+          required: CORE_MODELS.map(m => m.tableName),
+          tableCount: 0,
+          hasDefaultData: false,
+          userCount: 0,
+          activeUserCount: 0,
+          inactiveUserCount: 0,
+        },
+      });
+    }
+
     const [results] = await sequelize.query(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
     );
     const tableNames = results.map(r => r.table_name);
-    const requiredTables = ['system_users', 'system_config', 'system_logs', 'system_modules'];
+    const requiredTables = CORE_MODELS.map(m => m.tableName);
     const initialized = requiredTables.every(t => tableNames.includes(t));
 
     let hasDefaultData = false;
@@ -87,6 +135,7 @@ router.get('/schema-status', authenticate, authorize('admin'), async (req, res, 
     res.json({
       success: true,
       data: {
+        connected: true,
         initialized,
         tables: tableNames,
         required: requiredTables,
@@ -101,35 +150,121 @@ router.get('/schema-status', authenticate, authorize('admin'), async (req, res, 
 });
 
 /**
+ * GET /database/schema-info — Returns details of tables that will be created
+ */
+router.get('/schema-info', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    const tables = CORE_MODELS.map(entry => ({
+      tableName: entry.tableName,
+      description: entry.description,
+      columns: getModelColumns(entry.model),
+    }));
+    res.json({ success: true, data: { tables, totalTables: tables.length } });
+  } catch (err) { next(err); }
+});
+
+/**
+ * GET /database/default-data-info — Returns details of default data that will be seeded
+ */
+router.get('/default-data-info', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    const info = {
+      items: [
+        {
+          type: 'user',
+          table: 'system_users',
+          description: 'Default platform admin user',
+          details: {
+            name: appConfig.defaultAdmin.name,
+            email: appConfig.defaultAdmin.email,
+            role: appConfig.defaultAdmin.role,
+            status: 'active',
+          },
+        },
+        {
+          type: 'modules',
+          table: 'system_modules',
+          description: 'Module registry records from modules.json',
+          details: {
+            note: 'Module records are seeded automatically on server startup. This ensures modules are registered in the database.',
+          },
+        },
+      ],
+    };
+    res.json({ success: true, data: info });
+  } catch (err) { next(err); }
+});
+
+/**
  * @swagger
  * /database/create-schema:
  *   post:
  *     tags: [Database]
- *     summary: Synchronize Sequelize models to create/update tables
+ *     summary: Create CORE system_* tables only (module tables are created from Module Management)
  *     responses:
- *       200: { description: Schema created }
+ *       200: { description: Core schema created with details }
  */
 router.post('/create-schema', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    logger.info(logMessages.database.syncing);
-    await sequelize.sync({ alter: true });
-    logger.info(logMessages.database.schemaCreated);
-
-    const userCount = await User.count();
-    if (userCount === 0) {
-      logger.info(logMessages.database.seedingDefault);
-      await User.create({
-        name: appConfig.defaultAdmin.name,
-        email: appConfig.defaultAdmin.email,
-        password: appConfig.defaultAdmin.password,
-        role: appConfig.defaultAdmin.role,
-        status: 'active',
+    // Test connection first
+    const connTest = await testConnection();
+    if (!connTest.success) {
+      return res.status(503).json({
+        success: false,
+        error: { message: 'Database connection failed. Configure the database first.', code: 'DB_CONNECTION_FAILED' },
       });
-      logger.info(logMessages.database.seedComplete);
     }
 
-    res.json({ success: true, data: { message: 'Schema synchronized successfully' } });
+    logger.info(logMessages.database.syncing);
+
+    const createdTables = [];
+    for (const entry of CORE_MODELS) {
+      await entry.model.sync({ alter: true });
+      const columns = getModelColumns(entry.model);
+      createdTables.push({
+        tableName: entry.tableName,
+        description: entry.description,
+        columnCount: columns.length,
+        columns: columns.map(c => c.name),
+        status: 'created',
+      });
+    }
+
+    logger.info(logMessages.database.schemaCreated);
+
+    // Log this action
+    try {
+      await SystemLog.create({
+        level: 'info',
+        source: 'System',
+        event: 'Schema Initialization',
+        message: `Core schema initialized: ${createdTables.length} tables created`,
+        userId: req.user.id,
+        userEmail: req.user.email,
+        result: 'success',
+        metadata: { tables: createdTables.map(t => t.tableName) },
+      });
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Core database schema initialized successfully',
+        tablesCreated: createdTables.length,
+        tables: createdTables,
+        note: 'Module-specific tables are created from the Module Management section when a module is enabled.',
+      },
+    });
   } catch (err) { next(err); }
+});
+
+/**
+ * POST /database/sync — Alias for create-schema (used by frontend)
+ */
+router.post('/sync', authenticate, authorize('admin'), async (req, res, next) => {
+  // Delegate to create-schema handler
+  req.url = '/create-schema';
+  router.handle(req, res, next);
 });
 
 /**
@@ -143,10 +278,8 @@ router.post('/create-schema', authenticate, authorize('admin'), async (req, res,
  */
 router.get('/stats', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    // Test connection first
     const connectionTest = await testConnection();
     if (!connectionTest.success) {
-      logger.warn('Database stats requested but connection failed', { error: connectionTest.error });
       return res.status(503).json({
         success: false,
         error: {
@@ -192,47 +325,15 @@ router.get('/stats', authenticate, authorize('admin'), async (req, res, next) =>
 });
 
 /**
- * @swagger
- * /database/load-demo-data:
- *   post:
- *     tags: [Database]
- *     summary: Load demo/sample data into the database
- *     responses:
- *       200: { description: Demo data loaded }
- */
-/**
- * POST /database/sync — Alias for create-schema (used by frontend SettingsDbObjects)
- */
-router.post('/sync', authenticate, authorize('admin'), async (req, res, next) => {
-  try {
-    logger.info(logMessages.database.syncing);
-    await sequelize.sync({ alter: true });
-    logger.info(logMessages.database.schemaCreated);
-
-    const userCount = await User.count();
-    if (userCount === 0) {
-      logger.info(logMessages.database.seedingDefault);
-      await User.create({
-        name: appConfig.defaultAdmin.name,
-        email: appConfig.defaultAdmin.email,
-        password: appConfig.defaultAdmin.password,
-        role: appConfig.defaultAdmin.role,
-        status: 'active',
-      });
-      logger.info(logMessages.database.seedComplete);
-    }
-
-    res.json({ success: true, data: { message: 'Database synchronized successfully' } });
-  } catch (err) { next(err); }
-});
-
-/**
- * POST /database/load-default-data — Seed default admin user
+ * POST /database/load-default-data — Seed default admin user and module registry
  */
 router.post('/load-default-data', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     logger.info(logMessages.database.seedingDefault);
-    const [user, created] = await User.findOrCreate({
+    const seededItems = [];
+
+    // Seed default admin user
+    const [user, userCreated] = await User.findOrCreate({
       where: { email: appConfig.defaultAdmin.email },
       defaults: {
         name: appConfig.defaultAdmin.name,
@@ -241,26 +342,88 @@ router.post('/load-default-data', authenticate, authorize('admin'), async (req, 
         status: 'active',
       },
     });
-    if (!created) {
-      logger.info('Default admin user already exists, skipping seed');
-    }
+    seededItems.push({
+      type: 'user',
+      table: 'system_users',
+      name: appConfig.defaultAdmin.name,
+      email: appConfig.defaultAdmin.email,
+      role: appConfig.defaultAdmin.role,
+      created: userCreated,
+      status: userCreated ? 'created' : 'already_exists',
+    });
+
+    // Seed module registry from modules.json
+    try {
+      const modulesConfig = require('#config/modules.json');
+      for (const mod of modulesConfig.modules) {
+        const [record, modCreated] = await SystemModule.findOrCreate({
+          where: { moduleId: mod.moduleId },
+          defaults: {
+            name: mod.name,
+            description: mod.description,
+            version: mod.version,
+            enabled: mod.enabled,
+            initialized: mod.initialized,
+            isCore: mod.isCore,
+            requiredTables: mod.requiredTables,
+            roles: mod.roles,
+            order: mod.order,
+            schemaVersion: mod.schemaVersion,
+          },
+        });
+        seededItems.push({
+          type: 'module',
+          table: 'system_modules',
+          name: mod.name,
+          moduleId: mod.moduleId,
+          created: modCreated,
+          status: modCreated ? 'created' : 'already_exists',
+        });
+      }
+    } catch (_) {}
+
     logger.info(logMessages.database.seedComplete);
-    res.json({ success: true, data: { message: 'Default data loaded successfully', created } });
+
+    // Log this action
+    try {
+      await SystemLog.create({
+        level: 'info',
+        source: 'System',
+        event: 'Default Data Loaded',
+        message: `Default data loaded: ${seededItems.filter(i => i.created).length} new items`,
+        userId: req.user.id,
+        userEmail: req.user.email,
+        result: 'success',
+        metadata: { items: seededItems },
+      });
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Default data loaded successfully',
+        totalItems: seededItems.length,
+        newItems: seededItems.filter(i => i.created).length,
+        items: seededItems,
+      },
+    });
   } catch (err) { next(err); }
 });
 
 router.post('/load-demo-data', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     logger.info(logMessages.database.seedingDemo);
+    const seededItems = [];
     const demoUsers = [
       { name: 'Jane Manager', email: 'manager@pulseops.local', password: 'manager123', role: 'manager', status: 'active' },
       { name: 'John User', email: 'user@pulseops.local', password: 'user123', role: 'user', status: 'active' },
     ];
     for (const u of demoUsers) {
-      await User.findOrCreate({ where: { email: u.email }, defaults: u });
+      const [, created] = await User.findOrCreate({ where: { email: u.email }, defaults: u });
+      seededItems.push({ type: 'user', name: u.name, email: u.email, role: u.role, created, status: created ? 'created' : 'already_exists' });
     }
     logger.info(logMessages.database.seedComplete);
-    res.json({ success: true, data: { message: 'Demo data loaded successfully' } });
+    res.json({ success: true, data: { message: 'Demo data loaded successfully', items: seededItems } });
   } catch (err) { next(err); }
 });
 
@@ -269,21 +432,58 @@ router.post('/load-demo-data', authenticate, authorize('admin'), async (req, res
  * /database/wipe:
  *   post:
  *     tags: [Database]
- *     summary: Wipe all data from all tables (destructive)
+ *     summary: DROP ALL tables from the database (destructive — removes everything)
  *     responses:
- *       200: { description: Data wiped }
+ *       200: { description: All tables dropped }
  */
 router.post('/wipe', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     logger.info(logMessages.database.wipeStarted);
-    await RosterSchedule.destroy({ where: {}, truncate: true, cascade: true });
-    await RosterConfig.destroy({ where: {}, truncate: true, cascade: true });
-    await SystemConfig.destroy({ where: {}, truncate: true, cascade: true });
-    // Reset non-core modules to disabled/uninitialized (preserve registry records)
-    await SystemModule.update({ enabled: false, initialized: false }, { where: { isCore: false } });
-    await User.destroy({ where: {}, truncate: true, cascade: true });
+
+    // Get all existing tables before dropping
+    const [existingTables] = await sequelize.query(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+    );
+    const tableNames = existingTables.map(r => r.table_name);
+
+    if (tableNames.length === 0) {
+      return res.json({ success: true, data: { message: 'No tables to drop', droppedTables: [], droppedCount: 0 } });
+    }
+
+    // Drop ALL tables using CASCADE to handle foreign keys
+    await sequelize.query('SET session_replication_role = replica;');
+    const droppedTables = [];
+    for (const tableName of tableNames) {
+      try {
+        await sequelize.query(`DROP TABLE IF EXISTS "${tableName}" CASCADE`);
+        droppedTables.push({ tableName, status: 'dropped' });
+      } catch (dropErr) {
+        droppedTables.push({ tableName, status: 'error', error: dropErr.message });
+      }
+    }
+    await sequelize.query('SET session_replication_role = DEFAULT;');
+
+    // Drop any remaining enum types
+    try {
+      const [enums] = await sequelize.query(
+        "SELECT typname FROM pg_type WHERE typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public') AND typtype = 'e'"
+      );
+      for (const e of enums) {
+        await sequelize.query(`DROP TYPE IF EXISTS "${e.typname}" CASCADE`);
+      }
+    } catch (_) {}
+
     logger.info(logMessages.database.wipeComplete);
-    res.json({ success: true, data: { message: 'All data wiped successfully' } });
+
+    res.json({
+      success: true,
+      data: {
+        message: 'All database tables dropped successfully. Database is now empty.',
+        droppedCount: droppedTables.filter(t => t.status === 'dropped').length,
+        droppedTables,
+        note: 'Use Initialize Database to recreate the core schema.',
+      },
+    });
   } catch (err) { next(err); }
 });
 

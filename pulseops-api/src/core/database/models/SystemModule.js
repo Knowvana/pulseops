@@ -21,7 +21,7 @@
 //   updates SystemModule.initialized = true → module appears in TopNav
 // ============================================================================
 import { DataTypes } from 'sequelize';
-import sequelize from '../sequelize.js';
+import sequelize from '#core/database/sequelize.js';
 
 const SystemModule = sequelize.define('SystemModule', {
   id: {

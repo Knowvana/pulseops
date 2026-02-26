@@ -24,6 +24,7 @@ export { default as LoginForm } from '@shared/components/LoginForm';
 export { default as StatusTile } from '@shared/components/StatusTile';
 export { default as Modal } from '@shared/components/Modal';
 export { default as SettingsConfig } from '@shared/components/SettingsConfig';
+export { default as ConfirmDialog } from '@shared/components/ConfirmDialog';
 
 // --- Wizards ---
 export { default as StepWizard } from '@shared/components/wizards/StepWizard';

@@ -16,7 +16,7 @@
 //   employees on leave are excluded from shift assignments
 // ============================================================================
 import { DataTypes } from 'sequelize';
-import sequelize from '../../../core/database/sequelize.js';
+import sequelize from '#core/database/sequelize.js';
 
 const ShiftRoasterLeave = sequelize.define('ShiftRoasterLeave', {
   id: {

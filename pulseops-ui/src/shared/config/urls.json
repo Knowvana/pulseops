@@ -12,5 +12,14 @@
   "rosterEmployeesEndpoint": "http://localhost:4000/api/roster/employees",
   "rosterLeavesEndpoint": "http://localhost:4000/api/roster/leaves",
   "rosterCurrentShiftEndpoint": "http://localhost:4000/api/roster/current-shift",
-  "rosterStatsEndpoint": "http://localhost:4000/api/roster/stats"
+  "rosterStatsEndpoint": "http://localhost:4000/api/roster/stats",
+  "databaseSchemaInfoEndpoint": "http://localhost:4000/api/database/schema-info",
+  "databaseDefaultDataInfoEndpoint": "http://localhost:4000/api/database/default-data-info",
+  "databaseTestConnectionEndpoint": "http://localhost:4000/api/database/test-connection",
+  "databaseSchemaStatusEndpoint": "http://localhost:4000/api/database/schema-status",
+  "databaseCreateSchemaEndpoint": "http://localhost:4000/api/database/create-schema",
+  "databaseLoadDefaultDataEndpoint": "http://localhost:4000/api/database/load-default-data",
+  "databaseLoadDemoDataEndpoint": "http://localhost:4000/api/database/load-demo-data",
+  "databaseWipeEndpoint": "http://localhost:4000/api/database/wipe",
+  "databaseStatsEndpoint": "http://localhost:4000/api/database/stats"
 }

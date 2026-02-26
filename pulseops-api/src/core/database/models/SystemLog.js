@@ -5,7 +5,7 @@
 // with source, event, API metadata, and request/response details.
 // ============================================================================
 import { DataTypes } from 'sequelize';
-import sequelize from '../sequelize.js';
+import sequelize from '#core/database/sequelize.js';
 
 const SystemLog = sequelize.define('SystemLog', {
   id: {

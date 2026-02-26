@@ -27,11 +27,11 @@ import SystemLog from './SystemLog.js';
 import SystemModule from './SystemModule.js';
 
 // --- Module Models (registered but tables created on module enable) ---
-import RosterSchedule from '../../../modules/roster/models/RosterSchedule.js';
-import RosterConfig from '../../../modules/roster/models/RosterConfig.js';
-import ShiftRoasterShift from '../../../modules/roster/models/ShiftRoasterShift.js';
-import ShiftRoasterEmployee from '../../../modules/roster/models/ShiftRoasterEmployee.js';
-import ShiftRoasterLeave from '../../../modules/roster/models/ShiftRoasterLeave.js';
+import RosterSchedule from '#modules/roster/models/RosterSchedule.js';
+import RosterConfig from '#modules/roster/models/RosterConfig.js';
+import ShiftRoasterShift from '#modules/roster/models/ShiftRoasterShift.js';
+import ShiftRoasterEmployee from '#modules/roster/models/ShiftRoasterEmployee.js';
+import ShiftRoasterLeave from '#modules/roster/models/ShiftRoasterLeave.js';
 
 // --- Associations ---
 ShiftRoasterLeave.belongsTo(ShiftRoasterEmployee, { foreignKey: 'employeeId', as: 'employee' });

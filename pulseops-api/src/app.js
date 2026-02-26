@@ -15,21 +15,21 @@ import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { createRequire } from 'module';
 
-import requestLogger from './core/middleware/requestLogger.js';
-import errorHandler from './core/middleware/errorHandler.js';
+import requestLogger from '#core/middleware/requestLogger.js';
+import errorHandler from '#core/middleware/errorHandler.js';
 
-import healthRoutes from './core/routes/healthRoutes.js';
-import authRoutes from './core/routes/authRoutes.js';
-import databaseRoutes from './core/routes/databaseRoutes.js';
-import userRoutes from './core/routes/userRoutes.js';
-import configRoutes from './core/routes/configRoutes.js';
-import logsRoutes from './core/routes/logsRoutes.js';
-import moduleRoutes from './core/routes/moduleRoutes.js';
-import rosterRoutes from './modules/roster/routes/rosterRoutes.js';
+import healthRoutes from '#core/routes/healthRoutes.js';
+import authRoutes from '#core/routes/authRoutes.js';
+import databaseRoutes from '#core/routes/databaseRoutes.js';
+import userRoutes from '#core/routes/userRoutes.js';
+import configRoutes from '#core/routes/configRoutes.js';
+import logsRoutes from '#core/routes/logsRoutes.js';
+import moduleRoutes from '#core/routes/moduleRoutes.js';
+import rosterRoutes from '#modules/roster/routes/rosterRoutes.js';
 
 const require = createRequire(import.meta.url);
-const appConfig = require('./config/app.json');
-const swaggerConfig = require('./config/swagger.json');
+const appConfig = require('#config/app.json');
+const swaggerConfig = require('#config/swagger.json');
 
 export default function createApp() {
   const app = express();

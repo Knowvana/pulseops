@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Database, RefreshCw, Save, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 import { Card, Button, ProgressModal, ActionModal, StatusTile, Logger, ApiClient } from '@shared';
 import uiText from '@shared/config/uiElementsText.json';
 import messages from '@shared/config/messages.json';
+import urls from '@shared/config/urls.json';
 
 const txt = uiText.platformAdmin.settings.database;
 
@@ -52,13 +53,53 @@ export default function SettingsDatabase() {
   const [saveProgress, setSaveProgress] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Auto-check connection status on mount
+  useEffect(() => {
+    const checkConnectionOnLoad = async () => {
+      try {
+        const result = await ApiClient.get(urls.databaseTestConnectionEndpoint);
+        if (result?.success) {
+          const latency = result.data?.latencyMs || 0;
+          const dbVersion = result.data?.dbVersion || null;
+          const dbSystemTime = result.data?.dbSystemTime || null;
+          const versionShort = dbVersion ? dbVersion.split(',')[0].replace('PostgreSQL ', '') : 'Unknown';
+          const systemTime = dbSystemTime ? new Date(dbSystemTime).toLocaleString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+          }) : 'Unknown';
+          setUnifiedStatus({
+            type: 'connection',
+            status: 'success',
+            message: result.data?.message || messages.success.dbConnected,
+            meta: `Response Time: ${latency}ms • Database Version: ${versionShort} • Database System Time: ${systemTime}`,
+          });
+        } else {
+          setUnifiedStatus({
+            type: 'connection',
+            status: 'error',
+            message: result?.data?.message || result?.error?.message || messages.errors.dbConnectionFailed,
+            meta: null,
+          });
+        }
+      } catch {
+        setUnifiedStatus({
+          type: 'connection',
+          status: 'error',
+          message: messages.errors.dbConnectionFailed,
+          meta: null,
+        });
+      }
+    };
+    checkConnectionOnLoad();
+  }, []);
+
   const handleTestConnect = useCallback(async () => {
     setIsTesting(true);
     setTestProgress(10);
     setUnifiedStatus({ type: null, status: 'neutral', message: '', meta: null });
     try {
       setTestProgress(40);
-      const result = await ApiClient.get('/database/test-connection');
+      const result = await ApiClient.get(urls.databaseTestConnectionEndpoint);
       setTestProgress(90);
 
       if (result?.success) {
@@ -126,7 +167,7 @@ export default function SettingsDatabase() {
         payload.password = dbConfig.password;
       }
 
-      const result = await ApiClient.post('/config/database', payload);
+      const result = await ApiClient.post(urls.configEndpoint + '/database', payload);
       setSaveProgress(90);
 
       if (result?.success) {

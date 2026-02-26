@@ -11,9 +11,9 @@
 //   DELETE /api/config/:key    — Delete config by key
 // ============================================================================
 import { Router } from 'express';
-import { SystemConfig } from '../database/models/index.js';
-import { authenticate, authorize } from '../middleware/auth.js';
-import logger, { logMessages } from '../logger.js';
+import { SystemConfig } from '#core/database/models/index.js';
+import { authenticate, authorize } from '#core/middleware/auth.js';
+import logger, { logMessages } from '#core/logger.js';
 
 const router = Router();
 
@@ -39,12 +39,46 @@ function writeJsonConfig(filename, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
 }
 
+// ─── Helpers: Dual-write (file + DB) for K8s persistence ─────────────────────
+
+async function persistToDb(key, value, category = 'system') {
+  try {
+    const jsonValue = typeof value === 'string' ? value : JSON.stringify(value);
+    await SystemConfig.upsert({ key, value: jsonValue, category });
+  } catch (_) {
+    // DB may not be initialized yet — file-only fallback is acceptable
+  }
+}
+
+async function readFromDb(key) {
+  try {
+    const record = await SystemConfig.findOne({ where: { key } });
+    if (record?.value) {
+      try { return JSON.parse(record.value); } catch (_) { return record.value; }
+    }
+  } catch (_) {
+    // DB unavailable — fall through to file
+  }
+  return null;
+}
+
+async function readConfig(key, filename, fallback = {}) {
+  const dbValue = await readFromDb(key);
+  if (dbValue) return dbValue;
+  return readJsonConfig(filename) || fallback;
+}
+
+async function writeConfig(key, filename, data) {
+  writeJsonConfig(filename, data);
+  await persistToDb(key, data);
+}
+
 // ─── Database Config ──────────────────────────────────────────────────────────
 
 router.post('/database', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     const { host, port, database, username, password, ssl } = req.body;
-    const existing = readJsonConfig('database.json') || {};
+    const existing = await readConfig('config:database', 'database.json', {});
     const updated = {
       ...existing,
       host: host || existing.host,
@@ -56,7 +90,7 @@ router.post('/database', authenticate, authorize('admin'), async (req, res, next
     if (password) {
       updated.passwordHash = await bcrypt.hash(password, 10);
     }
-    writeJsonConfig('database.json', updated);
+    await writeConfig('config:database', 'database.json', updated);
     logger.info(logMessages.platform?.configSaved || 'Database config saved');
     res.json({ success: true, data: { message: 'Database configuration saved' } });
   } catch (err) { next(err); }
@@ -66,7 +100,7 @@ router.post('/database', authenticate, authorize('admin'), async (req, res, next
 
 router.get('/auth', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    const authConfig = readJsonConfig('authConfig.json') || { method: 'json' };
+    const authConfig = await readConfig('config:auth', 'authConfig.json', { method: 'json' });
     res.json({ success: true, data: authConfig });
   } catch (err) { next(err); }
 });
@@ -78,7 +112,7 @@ router.post('/auth', authenticate, authorize('admin'), async (req, res, next) =>
       return res.status(400).json({ success: false, error: { message: 'Invalid auth method. Must be "json" or "database".' } });
     }
     const authConfig = { method, updatedAt: new Date().toISOString() };
-    writeJsonConfig('authConfig.json', authConfig);
+    await writeConfig('config:auth', 'authConfig.json', authConfig);
     logger.info(`Auth method switched to ${method}`);
     res.json({ success: true, data: authConfig });
   } catch (err) { next(err); }
@@ -88,7 +122,7 @@ router.post('/auth', authenticate, authorize('admin'), async (req, res, next) =>
 
 router.get('/logging', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    const loggingConfig = readJsonConfig('loggingConfig.json') || {
+    const loggingConfig = await readConfig('config:logging', 'loggingConfig.json', {
       logLevel: 'debug',
       consoleOutput: true,
       captureApiCalls: true,
@@ -98,7 +132,7 @@ router.get('/logging', authenticate, authorize('admin'), async (req, res, next) 
       dbRetention: 10000,
       autoCleanup: true,
       moduleLogging: {},
-    };
+    });
     res.json({ success: true, data: loggingConfig });
   } catch (err) { next(err); }
 });
@@ -106,7 +140,7 @@ router.get('/logging', authenticate, authorize('admin'), async (req, res, next) 
 router.post('/logging', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     const config = { ...req.body, updatedAt: new Date().toISOString() };
-    writeJsonConfig('loggingConfig.json', config);
+    await writeConfig('config:logging', 'loggingConfig.json', config);
     logger.info('Logging configuration saved');
     res.json({ success: true, data: config });
   } catch (err) { next(err); }

@@ -22,13 +22,13 @@
 // ============================================================================
 import { createRequire } from 'module';
 import createApp from './app.js';
-import sequelize from './core/database/sequelize.js';
-import models from './core/database/models/index.js';
-import logger, { msg, logMessages } from './core/logger.js';
+import sequelize from '#core/database/sequelize.js';
+import models from '#core/database/models/index.js';
+import logger, { msg, logMessages } from '#core/logger.js';
 
 const require = createRequire(import.meta.url);
-const appConfig = require('./config/app.json');
-const modulesConfig = require('./config/modules.json');
+const appConfig = require('#config/app.json');
+const modulesConfig = require('#config/modules.json');
 
 const PORT = process.env.PORT || appConfig.port;
 

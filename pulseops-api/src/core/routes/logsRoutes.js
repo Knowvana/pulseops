@@ -14,9 +14,9 @@
 // ============================================================================
 import { Router } from 'express';
 import { Op } from 'sequelize';
-import { SystemLog } from '../database/models/index.js';
-import { authenticate, authorize } from '../middleware/auth.js';
-import logger, { logMessages } from '../logger.js';
+import { SystemLog } from '#core/database/models/index.js';
+import { authenticate, authorize } from '#core/middleware/auth.js';
+import logger, { logMessages } from '#core/logger.js';
 
 const router = Router();
 

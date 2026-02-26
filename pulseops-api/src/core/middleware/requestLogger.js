@@ -20,8 +20,8 @@
 // WHO USES THIS FILE: The PulseOps API server uses this middleware for all incoming HTTP requests.
 // Developers can monitor API activity through the logs, and administrators can control logging via the settings.
 // ============================================================================
-import logger, { msg, logMessages } from '../logger.js';
-import { SystemLog } from '../database/models/index.js';
+import logger, { msg, logMessages } from '#core/logger.js';
+import { SystemLog } from '#core/database/models/index.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

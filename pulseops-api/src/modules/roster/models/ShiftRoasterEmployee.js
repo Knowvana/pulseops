@@ -17,7 +17,7 @@
 //   employees → RosterDashboard assigns them to shifts
 // ============================================================================
 import { DataTypes } from 'sequelize';
-import sequelize from '../../../core/database/sequelize.js';
+import sequelize from '#core/database/sequelize.js';
 
 const ShiftRoasterEmployee = sequelize.define('ShiftRoasterEmployee', {
   id: {

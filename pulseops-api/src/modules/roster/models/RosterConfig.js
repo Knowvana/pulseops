@@ -5,7 +5,7 @@
 // JSON blob. One active config per installation.
 // ============================================================================
 import { DataTypes } from 'sequelize';
-import sequelize from '../../../core/database/sequelize.js';
+import sequelize from '#core/database/sequelize.js';
 
 const RosterConfig = sequelize.define('RosterConfig', {
   id: {

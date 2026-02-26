@@ -7,14 +7,14 @@
 //
 // USAGE: node src/core/database/sync.js
 // ============================================================================
-import sequelize from './sequelize.js';
-import models from './models/index.js';
-import logger, { logMessages } from '../logger.js';
+import sequelize from '#core/database/sequelize.js';
+import models from '#core/database/models/index.js';
+import logger, { logMessages } from '#core/logger.js';
 import { createRequire } from 'module';
 import bcrypt from 'bcryptjs';
 
 const require = createRequire(import.meta.url);
-const appConfig = require('../../config/app.json');
+const appConfig = require('#config/app.json');
 
 async function syncDatabase() {
   try {

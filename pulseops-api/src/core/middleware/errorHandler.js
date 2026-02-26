@@ -4,7 +4,7 @@
 // PURPOSE: Global error handler. Catches unhandled errors from routes and
 // middleware, logs them, and returns a standardized JSON error response.
 // ============================================================================
-import logger from '../logger.js';
+import logger from '#core/logger.js';
 
 export default function errorHandler(err, req, res, _next) {
   const statusCode = err.statusCode || 500;

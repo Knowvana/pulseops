@@ -20,8 +20,8 @@
 //   Admin clicks Enable Module → StepWizard → POST /api/modules/shiftroaster/initialize
 //   → this file's createSchema() → tables created → module marked initialized
 // ============================================================================
-import sequelize from '../../core/database/sequelize.js';
-import logger, { logMessages } from '../../core/logger.js';
+import sequelize from '#core/database/sequelize.js';
+import logger, { logMessages } from '#core/logger.js';
 import { createRequire } from 'module';
 
 // Import all module models (this registers them with Sequelize)

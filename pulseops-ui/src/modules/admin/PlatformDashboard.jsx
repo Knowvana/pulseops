@@ -43,7 +43,8 @@ import ShiftRosterApp from '@modules/roster/ShiftRosterApp';
 const settingsTxt = uiText.platformAdmin.settings;
 
 const MODULE_ICON_MAP = {
-  Shield, Calendar, Package, LayoutDashboard,
+  platform_admin: Shield,
+  shiftroaster: Calendar,
 };
 
 const ADMIN_NAV_ITEMS = [
@@ -78,21 +79,34 @@ export default function PlatformDashboard({ user, onLogout }) {
 
   useEffect(() => { fetchModules(); }, [fetchModules]);
 
-  // Build TopNav module list from DB — only enabled modules for this role
+  // Build TopNav module list — always include Admin, plus enabled DB modules
   const availableModules = useMemo(() => {
-    return dbModules
-      .filter(m => m.enabled && (m.roles || []).includes(user?.role || 'user'))
+    const adminModule = {
+      id: 'platform_admin',
+      name: 'Admin',
+      shortName: 'Admin',
+      description: 'Platform Administration',
+      icon: Shield,
+      roles: ['super_admin', 'admin'],
+      enabled: true,
+      order: 0,
+    };
+
+    const enabledDbModules = dbModules
+      .filter(m => m.enabled && m.moduleId !== 'platform_admin' && (m.roles || []).includes(user?.role || 'user'))
       .sort((a, b) => (a.order || 0) - (b.order || 0))
       .map(m => ({
         id: m.moduleId,
         name: m.name,
         shortName: m.name,
         description: m.description,
-        icon: MODULE_ICON_MAP[m.moduleId === 'platform_admin' ? 'Shield' : 'Calendar'] || Package,
+        icon: MODULE_ICON_MAP[m.moduleId] || Package,
         roles: m.roles,
         enabled: m.enabled,
-        order: m.order,
+        order: m.order || 99,
       }));
+
+    return [adminModule, ...enabledDbModules];
   }, [dbModules, user?.role]);
 
   // Get navItems for active module

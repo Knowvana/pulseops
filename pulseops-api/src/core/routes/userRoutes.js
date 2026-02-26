@@ -13,9 +13,9 @@
 //   DELETE /api/users/:id     — Delete user (admin)
 // ============================================================================
 import { Router } from 'express';
-import { User } from '../database/models/index.js';
-import { authenticate, authorize } from '../middleware/auth.js';
-import logger, { msg, logMessages } from '../logger.js';
+import { User } from '#core/database/models/index.js';
+import { authenticate, authorize } from '#core/middleware/auth.js';
+import logger, { msg, logMessages } from '#core/logger.js';
 
 const router = Router();
 

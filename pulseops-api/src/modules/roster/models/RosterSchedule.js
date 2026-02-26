@@ -5,7 +5,7 @@
 // full month's schedule stored as a JSON blob alongside metadata.
 // ============================================================================
 import { DataTypes } from 'sequelize';
-import sequelize from '../../../core/database/sequelize.js';
+import sequelize from '#core/database/sequelize.js';
 
 const RosterSchedule = sequelize.define('RosterSchedule', {
   id: {

@@ -47,7 +47,7 @@ class ApiClientService {
   }
 
   async _request(method, path, body = null, customHeaders = {}) {
-    const url = `${this._baseUrl}${path}`;
+    const url = path.startsWith('http') ? path : `${this._baseUrl}${path}`;
     const start = performance.now();
 
     try {

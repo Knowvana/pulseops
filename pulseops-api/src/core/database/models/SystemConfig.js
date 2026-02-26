@@ -5,7 +5,7 @@
 // Used for runtime settings that admins can modify via the UI.
 // ============================================================================
 import { DataTypes } from 'sequelize';
-import sequelize from '../sequelize.js';
+import sequelize from '#core/database/sequelize.js';
 
 const SystemConfig = sequelize.define('SystemConfig', {
   id: {

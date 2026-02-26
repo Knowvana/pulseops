@@ -13,7 +13,8 @@
     "dbInitFailed": "Database initialization failed. Check server logs.",
     "configSaveFailed": "Failed to save configuration. Please try again.",
     "authSwitchFailed": "Failed to switch authentication method.",
-    "schemaInitFailed": "Schema initialization failed."
+    "schemaInitFailed": "Schema initialization failed.",
+    "dbNotSetup": "Database is not configured or cannot be connected. Please setup the database in the Database Configuration section first."
   },
   "success": {
     "loginSuccess": "Signed in successfully.",
@@ -25,7 +26,7 @@
     "defaultDataLoaded": "Default data loaded successfully.",
     "demoDataLoaded": "Demo data loaded successfully.",
     "demoDataDeleted": "Demo data deleted successfully.",
-    "dbWiped": "All data wiped successfully.",
+    "dbWiped": "All database tables dropped successfully. Database is now empty.",
     "userCreated": "User created successfully.",
     "userUpdated": "User updated successfully.",
     "userDeleted": "User deleted successfully.",
@@ -35,8 +36,8 @@
   "confirm": {
     "loadDemoData": "This will add sample employees and shifts to your roster. Is that okay?",
     "deleteAllRoster": "Warning: This action cannot be undone. All roster data will be permanently erased.",
-    "wipeDatabase": "This will delete all documents from all tables but keep the table structure intact. This action cannot be undone.",
-    "initializeDb": "This will create the necessary database tables and seed default data. Continue?",
+    "wipeDatabase": "WARNING: This will permanently DROP ALL database tables including all module data and schema. The database will be completely empty after this operation. This action cannot be undone.",
+    "initializeDb": "This will create the core system database tables (system_users, system_config, system_logs, system_modules). Module-specific tables are created from Module Management. Continue?",
     "deleteUser": "Are you sure you want to delete this user? This action cannot be undone.",
     "switchAuthToDb": "This will switch authentication from JSON file to database. Ensure the database is initialized with at least one admin user. Continue?",
     "deleteDemoData": "This will remove all demo/sample data. Continue?"
@@ -45,6 +46,13 @@
     "sessionExpired": "Your session has expired. Please sign in again.",
     "dbNotConfigured": "Database is not configured. Using JSON file authentication.",
     "dbNotInitialized": "Database tables have not been created yet.",
+    "dbNotSetupTitle": "Database Not Setup",
+    "dbNotSetupMessage": "Please setup the database connection in the Database Configuration section and verify the connection before using this section.",
+    "schemaInfoTitle": "Core Database Schema Details",
+    "schemaInfoDescription": "The following core system tables will be created when you initialize the database. Module-specific tables are created separately from the Module Management section.",
+    "defaultDataInfoTitle": "Default Data Details",
+    "defaultDataInfoDescription": "The following default records will be seeded into the database to bootstrap the platform.",
+    "wipeCompleteNote": "Use Initialize Database to recreate the core schema.",
     "noLogsYet": "No log entries recorded yet.",
     "configUpdateNote": "Changes take effect immediately.",
     "passwordNotShown": "Password is not displayed for security reasons."

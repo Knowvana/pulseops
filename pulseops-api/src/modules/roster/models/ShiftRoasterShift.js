@@ -17,7 +17,7 @@
 //   UI RosterConfig reads/writes shifts → RosterDashboard displays them
 // ============================================================================
 import { DataTypes } from 'sequelize';
-import sequelize from '../../../core/database/sequelize.js';
+import sequelize from '#core/database/sequelize.js';
 
 const ShiftRoasterShift = sequelize.define('ShiftRoasterShift', {
   id: {

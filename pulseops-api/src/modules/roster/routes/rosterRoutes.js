@@ -51,9 +51,9 @@ import { Op } from 'sequelize';
 import {
   RosterSchedule, RosterConfig,
   ShiftRoasterShift, ShiftRoasterEmployee, ShiftRoasterLeave,
-} from '../../../core/database/models/index.js';
-import { authenticate, authorize } from '../../../core/middleware/auth.js';
-import logger, { msg, logMessages } from '../../../core/logger.js';
+} from '#core/database/models/index.js';
+import { authenticate, authorize } from '#core/middleware/auth.js';
+import logger, { msg, logMessages } from '#core/logger.js';
 
 const router = Router();
 

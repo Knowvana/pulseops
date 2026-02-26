@@ -10,10 +10,10 @@
 // ============================================================================
 import jwt from 'jsonwebtoken';
 import { createRequire } from 'module';
-import logger, { msg, logMessages } from '../logger.js';
+import logger, { msg, logMessages } from '#core/logger.js';
 
 const require = createRequire(import.meta.url);
-const appConfig = require('../../config/app.json');
+const appConfig = require('#config/app.json');
 
 /**
  * Middleware: Verify JWT token and attach user to request.
