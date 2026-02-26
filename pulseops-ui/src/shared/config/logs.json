@@ -48,6 +48,14 @@
       "deleted": "User deleted successfully",
       "statsLoaded": "User stats loaded"
     },
+    "modules": {
+      "fetched": "Modules list fetched from database",
+      "enabled": "Module enabled successfully",
+      "disabled": "Module disabled successfully",
+      "initialized": "Module schema initialized",
+      "demoDataLoaded": "Module demo data loaded",
+      "dataWiped": "Module data wiped"
+    },
     "common": {
       "loading": "Loading...",
       "saving": "Saving...",

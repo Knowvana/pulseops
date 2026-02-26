@@ -37,7 +37,7 @@ const RosterConfig = sequelize.define('RosterConfig', {
     allowNull: true,
   },
 }, {
-  tableName: 'roster_config',
+  tableName: 'shiftroaster_config',
   timestamps: true,
 });
 

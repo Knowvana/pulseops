@@ -1,7 +1,7 @@
 # PulseOps Refactor — Standalone Product Build
 
-**Status:** In Progress (UI Replication — operationsmanager design replicated)  
-**Last Updated:** Feb 25, 2026 6:45 PM UTC+05:30
+**Status:** Iteration 2 Complete — Module Management System, DB-backed Navigation, ShiftRoaster Enhancements  
+**Last Updated:** 2025 — Iteration 2
 
 ---
 
@@ -21,6 +21,25 @@ Refactoring a multi-tenant SaaS application into a **standalone Kubernetes-ready
 - ✅ Build Platform Admin module (no tenant management)
 - ✅ Swagger UI for API documentation
 - ✅ Kubernetes-ready (stateless, health probes, graceful shutdown)
+
+### Iteration 2 Requirements
+- ✅ DB-backed module management (system_modules table)
+- ✅ Admin Modules Page with enable/disable controls
+- ✅ Reusable StepWizard for module enablement (check → init → demo → enable)
+- ✅ Module schema lifecycle (schema.js per module)
+- ✅ Core system tables: `system_*` prefix (system_users, system_config, system_logs, system_modules)
+- ✅ Module tables: `modulename_*` prefix (shiftroaster_shifts, shiftroaster_employees, etc.)
+- ✅ Demo data JSON files per module
+- ✅ Universal reusable SettingsConfig component for all modules
+- ✅ Reusable Modal component for all dialogs
+- ✅ ModuleService for frontend API communication
+- ✅ ShiftRoaster: normalized models (shifts, employees, leaves as separate tables)
+- ✅ ShiftRoaster: current shift header bar with live countdown
+- ✅ ShiftRoaster: full CRUD API for shifts, employees, leaves
+- ✅ ShiftRoaster: dashboard stats + current-shift endpoints
+- ✅ MODULE_BUILDING_GUIDE.md documentation
+- ✅ Server startup seeds module registry from modules.json (K8s-safe)
+- ✅ Only core system tables synced on startup; module tables on-demand
 
 ---
 
@@ -93,14 +112,17 @@ pulseops/
 │   │   ├── core/
 │   │   │   ├── database/
 │   │   │   │   ├── sequelize.js    # Sequelize instance
-│   │   │   │   ├── models/         # User, SystemConfig, RosterSchedule, RosterConfig
+│   │   │   │   ├── models/         # User, SystemConfig, SystemLog, SystemModule + module models
 │   │   │   │   └── sync.js         # DB sync + seeding script
 │   │   │   ├── middleware/         # auth, errorHandler, requestLogger
-│   │   │   ├── routes/             # authRoutes, healthRoutes, databaseRoutes, userRoutes, configRoutes
+│   │   │   ├── routes/             # auth, health, database, user, config, logs, modules
 │   │   │   └── logger.js           # Winston logger with JSON templates
 │   │   ├── modules/
 │   │   │   └── roster/
-│   │   │       └── routes/         # rosterRoutes (CRUD for config + schedules)
+│   │   │       ├── models/         # ShiftRoasterShift, Employee, Leave, Schedule, Config
+│   │   │       ├── routes/         # Full CRUD for shifts, employees, leaves, schedules
+│   │   │       ├── schema.js       # createSchema, verifySchema, loadDemoData, wipeModuleData
+│   │   │       └── demoData.json   # Sample data for StepWizard
 │   │   ├── app.js                  # Express factory (middleware + routes)
 │   │   └── server.js               # Entry point (DB connect, graceful shutdown)
 │   ├── Dockerfile                  # Node.js non-root container
@@ -108,6 +130,9 @@ pulseops/
 │   └── .gitignore
 │
 ├── docker-compose-pgsql.yml        # PostgreSQL + pgAdmin (for local dev)
+├── docs/
+│   ├── ARCHITECTURE.md             # Architecture overview
+│   └── MODULE_BUILDING_GUIDE.md    # How to build a new module
 └── aiprompt/
     └── PULSEOPS_REFACTOR.md        # This file
 ```
@@ -248,33 +273,50 @@ pulseops/
 
 ## Database (PostgreSQL)
 
-### Models
-1. **User** (users table)
-   - id (UUID, PK)
-   - name, email (unique), password (bcrypt hashed)
-   - role (enum: admin, manager, user)
-   - status (enum: active, inactive)
-   - timestamps (createdAt, updatedAt)
+### Table Naming Convention
+- **Core system tables**: `system_*` prefix (e.g., `system_users`, `system_config`)
+- **Module tables**: `modulename_*` prefix (e.g., `shiftroaster_shifts`, `shiftroaster_employees`)
 
-2. **SystemConfig** (system_config table)
-   - id (UUID, PK)
-   - key (unique), value (text)
-   - category, description
+### Core System Models
+1. **User** (`system_users` table)
+   - id (UUID, PK), name, email (unique), password (bcrypt hashed)
+   - role (enum: admin, manager, user), status (enum: active, inactive)
    - timestamps
 
-3. **RosterSchedule** (roster_schedules table)
-   - id (UUID, PK)
-   - year, month (unique together)
-   - schedule (JSONB), metadata (JSONB)
-   - createdBy (user ID)
+2. **SystemConfig** (`system_config` table)
+   - id (UUID, PK), key (unique), value (text), category, description
    - timestamps
 
-4. **RosterConfig** (roster_config table)
-   - id (UUID, PK)
-   - shifts (JSONB array), employees (JSONB array), leaves (JSONB array)
-   - isActive (boolean)
-   - updatedBy (user ID)
+3. **SystemLog** (`system_logs` table)
+   - id (UUID, PK), timestamp, level, source, event, message
+   - userId, userEmail, result, apiUrl, httpMethod, responseCode, durationMs
+   - requestBody (JSON), responseBody (JSON), metadata (JSON)
+
+4. **SystemModule** (`system_modules` table) — **NEW in Iteration 2**
+   - id (UUID, PK), moduleId (unique), name, description, version
+   - enabled (boolean), initialized (boolean), isCore (boolean)
+   - schemaVersion, config (JSONB), requiredTables (JSONB), roles (JSONB)
+   - order, enabledAt, enabledBy
    - timestamps
+
+### ShiftRoaster Module Models — **NEW in Iteration 2**
+5. **ShiftRoasterShift** (`shiftroaster_shifts` table)
+   - id, label, shortCode, startTime, endTime, color
+   - reqWeekday, reqWeekend, isActive, order
+
+6. **ShiftRoasterEmployee** (`shiftroaster_employees` table)
+   - id, name, email, phone, role, skills (JSONB)
+   - maxShiftsPerWeek, isShiftLead, isActive
+
+7. **ShiftRoasterLeave** (`shiftroaster_leaves` table)
+   - id, employeeId (FK), startDate, endDate, leaveType
+   - reason, status (enum: pending, approved, rejected), approvedBy
+
+8. **RosterSchedule** (`shiftroaster_schedules` table)
+   - id, year, month (unique together), schedule (JSONB), metadata (JSONB), createdBy
+
+9. **RosterConfig** (`shiftroaster_config` table)
+   - id, shifts (JSONB), employees (JSONB), leaves (JSONB), isActive, updatedBy
 
 ### Default Admin User
 - Email: `admin@pulseops.local`
@@ -455,14 +497,27 @@ Or set `--loglevel verbose` for npm commands.
 
 ## Next Steps
 
+### Completed
 - [x] Verify frontend dev server (`npm run dev`)
 - [x] Verify backend dev server (`npm run dev`)
 - [x] Create comprehensive README.md with URLs, credentials, components
+- [x] DB-backed module management system (SystemModule model, moduleRoutes, ModuleService)
+- [x] Admin Modules Page with StepWizard enable flow
+- [x] Reusable shared components: Modal, StepWizard, SettingsConfig
+- [x] ShiftRoaster normalized models (separate shifts, employees, leaves tables)
+- [x] ShiftRoaster full CRUD API (shifts, employees, leaves, schedules)
+- [x] ShiftRoaster current shift header bar with live countdown
+- [x] Core table renaming to system_* prefix
+- [x] Module table naming with modulename_* prefix
+- [x] Server startup seeds module registry from modules.json
+- [x] MODULE_BUILDING_GUIDE.md documentation
+
+### Pending
 - [ ] Initialize PostgreSQL database (`docker-compose up -d`)
-- [ ] Sync database models (`node src/core/database/sync.js`)
-- [ ] Test login flow with default admin credentials
-- [ ] Test ShiftRoster module (load demo data, generate schedule)
-- [ ] Test Platform Admin module (user management, database stats)
+- [ ] Test full module enable flow (Admin → Modules → Enable ShiftRoaster)
+- [ ] Test ShiftRoster module end-to-end with DB-backed data
+- [ ] Build full User CRUD page (replace placeholder)
+- [ ] Implement RBAC enforcement for module-level access
 - [ ] Build Docker images and test containerized deployment
 - [ ] Set up Kubernetes manifests (Deployment, Service, ConfigMap, Secret)
 - [ ] Deploy to Kubernetes cluster
@@ -482,7 +537,7 @@ Or set `--loglevel verbose` for npm commands.
 - ✅ src/index.css
 - ✅ src/core/App.jsx (routes to PlatformDashboard, sets Logger user)
 - ✅ src/core/AppShell.jsx (TopNav + SideNav + RightPanel master layout)
-- ✅ src/shared/index.js (barrel: 11 components + 3 layouts + 3 services)
+- ✅ src/shared/index.js (barrel: 13 components + 1 wizard + 3 layouts + 4 services)
 - ✅ src/shared/config/urls.json
 - ✅ src/shared/config/logs.json
 - ✅ src/shared/config/app.json (unified modules array)
@@ -493,6 +548,7 @@ Or set `--loglevel verbose` for npm commands.
 - ✅ src/shared/services/logger.js (separate system/API buffers, subscriber pattern)
 - ✅ src/shared/services/authService.js
 - ✅ src/shared/services/demoDataService.js
+- ✅ src/shared/services/moduleService.js — **NEW** (frontend module API client)
 - ✅ src/shared/components/Card.jsx
 - ✅ src/shared/components/Button.jsx
 - ✅ src/shared/components/PageHeader.jsx
@@ -504,6 +560,9 @@ Or set `--loglevel verbose` for npm commands.
 - ✅ src/shared/components/EmptyState.jsx
 - ✅ src/shared/components/ConfirmationModal.jsx
 - ✅ src/shared/components/SettingsModal.jsx
+- ✅ src/shared/components/Modal.jsx — **NEW** (single overlay dialog for all modals)
+- ✅ src/shared/components/SettingsConfig.jsx — **NEW** (universal settings layout with vertical tabs)
+- ✅ src/shared/components/wizards/StepWizard.jsx — **NEW** (multi-step wizard for module enablement)
 - ✅ src/shared/components/layouts/TopNav.jsx
 - ✅ src/shared/components/layouts/SideNav.jsx
 - ✅ src/shared/components/layouts/RightPanel.jsx
@@ -513,8 +572,9 @@ Or set `--loglevel verbose` for npm commands.
 - ✅ src/modules/roster/ShiftRosterApp.jsx
 - ✅ src/modules/roster/components/*.jsx (4 files)
 - ✅ src/modules/roster/utils/*.js (2 files)
-- ✅ src/modules/admin/PlatformDashboard.jsx (thin orchestrator)
+- ✅ src/modules/admin/PlatformDashboard.jsx (DB-backed modules, universal SettingsConfig)
 - ✅ src/modules/admin/views/AdminOverview.jsx
+- ✅ src/modules/admin/views/ModulesPage.jsx — **NEW** (enable/disable modules with StepWizard)
 - ✅ src/modules/admin/views/LogsViewer.jsx
 - ✅ src/modules/admin/views/SettingsDatabase.jsx
 - ✅ src/modules/admin/views/SettingsDbObjects.jsx
@@ -526,26 +586,40 @@ Or set `--loglevel verbose` for npm commands.
 
 ### Backend (pulseops-api)
 - ✅ package.json
-- ✅ src/app.js
-- ✅ src/server.js
-- ✅ src/config/*.json (4 files)
+- ✅ src/app.js (+ moduleRoutes registered)
+- ✅ src/server.js (+ seeds module registry on startup, syncs CORE models only)
+- ✅ src/config/app.json
+- ✅ src/config/database.json
+- ✅ src/config/logs.json (+ modules log messages)
+- ✅ src/config/swagger.json
+- ✅ src/config/modules.json — **NEW** (module manifests + roles config)
+- ✅ src/config/defaultUsers.json
 - ✅ src/core/logger.js
 - ✅ src/core/database/sequelize.js
 - ✅ src/core/database/sync.js
-- ✅ src/core/database/models/User.js
-- ✅ src/core/database/models/SystemConfig.js
-- ✅ src/core/database/models/index.js
-- ✅ src/modules/roster/models/RosterSchedule.js
-- ✅ src/modules/roster/models/RosterConfig.js
+- ✅ src/core/database/models/User.js (table: system_users)
+- ✅ src/core/database/models/SystemConfig.js (table: system_config)
+- ✅ src/core/database/models/SystemLog.js (table: system_logs)
+- ✅ src/core/database/models/SystemModule.js — **NEW** (table: system_modules)
+- ✅ src/core/database/models/index.js (+ associations, all models)
+- ✅ src/modules/roster/models/RosterSchedule.js (table: shiftroaster_schedules)
+- ✅ src/modules/roster/models/RosterConfig.js (table: shiftroaster_config)
+- ✅ src/modules/roster/models/ShiftRoasterShift.js — **NEW** (table: shiftroaster_shifts)
+- ✅ src/modules/roster/models/ShiftRoasterEmployee.js — **NEW** (table: shiftroaster_employees)
+- ✅ src/modules/roster/models/ShiftRoasterLeave.js — **NEW** (table: shiftroaster_leaves)
+- ✅ src/modules/roster/schema.js — **NEW** (createSchema, verifySchema, loadDemoData, wipeModuleData)
+- ✅ src/modules/roster/demoData.json — **NEW** (12 employees, 3 shifts, 3 leaves)
 - ✅ src/core/middleware/auth.js
 - ✅ src/core/middleware/errorHandler.js
 - ✅ src/core/middleware/requestLogger.js
 - ✅ src/core/routes/authRoutes.js
 - ✅ src/core/routes/healthRoutes.js
-- ✅ src/core/routes/databaseRoutes.js
+- ✅ src/core/routes/databaseRoutes.js (updated for system_* table names)
 - ✅ src/core/routes/userRoutes.js
 - ✅ src/core/routes/configRoutes.js
-- ✅ src/modules/roster/routes/rosterRoutes.js
+- ✅ src/core/routes/logsRoutes.js
+- ✅ src/core/routes/moduleRoutes.js — **NEW** (full module lifecycle API)
+- ✅ src/modules/roster/routes/rosterRoutes.js (+ shifts, employees, leaves CRUD, current-shift, stats)
 - ✅ Dockerfile
 - ✅ .gitignore
 

@@ -2,11 +2,23 @@
 // Server Entry Point — PulseOps API
 //
 // PURPOSE: Starts the Express server, connects to the database, syncs
-// models, and handles graceful shutdown for Kubernetes deployments.
+// CORE system tables only, seeds default data, and handles graceful
+// shutdown for Kubernetes deployments.
 //
-// ARCHITECTURE: Imports the app factory, initializes the database,
-// starts listening, and registers SIGTERM/SIGINT handlers for clean
-// pod termination. All config from JSON files.
+// ARCHITECTURE: On startup, ONLY core system tables (system_users,
+// system_config, system_logs, system_modules) are created. Module-specific
+// tables are created on-demand when a module is enabled via the StepWizard.
+// This ensures clean separation between core platform and modules.
+//
+// STARTUP FLOW:
+//   1. Connect to PostgreSQL
+//   2. Sync CORE models only (User, SystemConfig, SystemLog, SystemModule)
+//   3. Seed default admin user if none exists
+//   4. Seed module registry records from modules.json
+//   5. Start Express server
+//   6. Register graceful shutdown handlers (SIGTERM/SIGINT)
+//
+// USED BY: Entry point — run via `node src/server.js` or `npm start`
 // ============================================================================
 import { createRequire } from 'module';
 import createApp from './app.js';
@@ -16,8 +28,54 @@ import logger, { msg, logMessages } from './core/logger.js';
 
 const require = createRequire(import.meta.url);
 const appConfig = require('./config/app.json');
+const modulesConfig = require('./config/modules.json');
 
 const PORT = process.env.PORT || appConfig.port;
+
+// Core system models — ONLY these are synced on startup
+const CORE_MODELS = [
+  models.User,
+  models.SystemConfig,
+  models.SystemLog,
+  models.SystemModule,
+];
+
+/**
+ * Seed module registry records from modules.json into system_modules table.
+ * Uses findOrCreate to avoid duplicates across pod restarts.
+ */
+async function seedModuleRegistry() {
+  logger.info(logMessages.modules.seedingModules);
+  for (const mod of modulesConfig.modules) {
+    const [record, created] = await models.SystemModule.findOrCreate({
+      where: { moduleId: mod.moduleId },
+      defaults: {
+        name: mod.name,
+        description: mod.description,
+        version: mod.version,
+        enabled: mod.enabled,
+        initialized: mod.initialized,
+        isCore: mod.isCore,
+        requiredTables: mod.requiredTables,
+        roles: mod.roles,
+        order: mod.order,
+        schemaVersion: mod.schemaVersion,
+      },
+    });
+    if (!created) {
+      // Update non-destructive fields (don't override enabled/initialized which are runtime state)
+      record.name = mod.name;
+      record.description = mod.description;
+      record.version = mod.version;
+      record.requiredTables = mod.requiredTables;
+      record.roles = mod.roles;
+      record.order = mod.order;
+      record.isCore = mod.isCore;
+      await record.save();
+    }
+  }
+  logger.info(logMessages.modules.modulesSeedComplete);
+}
 
 async function startServer() {
   try {
@@ -26,9 +84,11 @@ async function startServer() {
     await sequelize.authenticate();
     logger.info(logMessages.database.connected);
 
-    // --- Sync models (create tables if not exist) ---
+    // --- Sync CORE models only (create tables if not exist) ---
     logger.info(logMessages.database.syncing);
-    await sequelize.sync({ alter: false });
+    for (const Model of CORE_MODELS) {
+      await Model.sync({ alter: false });
+    }
     logger.info(logMessages.database.synced);
 
     // --- Seed default admin if no users exist ---
@@ -44,6 +104,9 @@ async function startServer() {
       });
       logger.info(logMessages.database.seedComplete);
     }
+
+    // --- Seed module registry ---
+    await seedModuleRegistry();
 
     // --- Start Express ---
     const app = createApp();

@@ -1,0 +1,56 @@
+{
+  "shifts": [
+    {
+      "label": "Morning",
+      "shortCode": "M",
+      "startTime": "06:00",
+      "endTime": "14:00",
+      "color": "bg-amber-100 text-amber-800 border-amber-200",
+      "reqWeekday": 3,
+      "reqWeekend": 1,
+      "isActive": true,
+      "order": 1
+    },
+    {
+      "label": "Afternoon",
+      "shortCode": "A",
+      "startTime": "14:00",
+      "endTime": "22:00",
+      "color": "bg-blue-100 text-blue-800 border-blue-200",
+      "reqWeekday": 3,
+      "reqWeekend": 1,
+      "isActive": true,
+      "order": 2
+    },
+    {
+      "label": "Night",
+      "shortCode": "N",
+      "startTime": "22:00",
+      "endTime": "06:00",
+      "color": "bg-indigo-100 text-indigo-800 border-indigo-200",
+      "reqWeekday": 2,
+      "reqWeekend": 1,
+      "isActive": true,
+      "order": 3
+    }
+  ],
+  "employees": [
+    { "name": "Alice Johnson", "email": "alice@pulseops.local", "role": "operator", "skills": ["monitoring", "incident-response"], "maxShiftsPerWeek": 5, "isShiftLead": true, "isActive": true },
+    { "name": "Bob Smith", "email": "bob@pulseops.local", "role": "operator", "skills": ["monitoring", "reporting"], "maxShiftsPerWeek": 5, "isShiftLead": false, "isActive": true },
+    { "name": "Carol Williams", "email": "carol@pulseops.local", "role": "operator", "skills": ["incident-response", "escalation"], "maxShiftsPerWeek": 5, "isShiftLead": false, "isActive": true },
+    { "name": "David Brown", "email": "david@pulseops.local", "role": "lead", "skills": ["monitoring", "incident-response", "escalation"], "maxShiftsPerWeek": 5, "isShiftLead": true, "isActive": true },
+    { "name": "Eve Davis", "email": "eve@pulseops.local", "role": "operator", "skills": ["monitoring", "documentation"], "maxShiftsPerWeek": 4, "isShiftLead": false, "isActive": true },
+    { "name": "Frank Miller", "email": "frank@pulseops.local", "role": "operator", "skills": ["monitoring", "reporting"], "maxShiftsPerWeek": 5, "isShiftLead": false, "isActive": true },
+    { "name": "Grace Wilson", "email": "grace@pulseops.local", "role": "operator", "skills": ["incident-response", "documentation"], "maxShiftsPerWeek": 5, "isShiftLead": false, "isActive": true },
+    { "name": "Henry Moore", "email": "henry@pulseops.local", "role": "lead", "skills": ["monitoring", "incident-response", "escalation", "reporting"], "maxShiftsPerWeek": 5, "isShiftLead": true, "isActive": true },
+    { "name": "Ivy Taylor", "email": "ivy@pulseops.local", "role": "operator", "skills": ["monitoring"], "maxShiftsPerWeek": 4, "isShiftLead": false, "isActive": true },
+    { "name": "Jack Anderson", "email": "jack@pulseops.local", "role": "operator", "skills": ["monitoring", "incident-response"], "maxShiftsPerWeek": 5, "isShiftLead": false, "isActive": true },
+    { "name": "Karen Thomas", "email": "karen@pulseops.local", "role": "operator", "skills": ["reporting", "documentation"], "maxShiftsPerWeek": 5, "isShiftLead": false, "isActive": true },
+    { "name": "Leo Jackson", "email": "leo@pulseops.local", "role": "operator", "skills": ["monitoring", "escalation"], "maxShiftsPerWeek": 5, "isShiftLead": false, "isActive": true }
+  ],
+  "leaves": [
+    { "employeeName": "Alice Johnson", "startDate": "2026-03-15", "endDate": "2026-03-18", "leaveType": "planned", "reason": "Family vacation" },
+    { "employeeName": "Bob Smith", "startDate": "2026-03-20", "endDate": "2026-03-21", "leaveType": "training", "reason": "Certification training" },
+    { "employeeName": "Eve Davis", "startDate": "2026-03-10", "endDate": "2026-03-12", "leaveType": "planned", "reason": "Personal time off" }
+  ]
+}

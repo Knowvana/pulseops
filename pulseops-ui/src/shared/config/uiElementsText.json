@@ -259,6 +259,30 @@
         "api": "No API calls match your filters"
       }
     },
+    "modules": {
+      "pageTitle": "Platform Modules",
+      "subtitle": "Manage and configure platform modules",
+      "coreBadge": "Core",
+      "schemaReady": "Schema Ready",
+      "schemaNotReady": "Schema Not Initialized",
+      "tables": "tables",
+      "enableButton": "Enable Module",
+      "disableButton": "Disable",
+      "coreMessage": "Core module — always active",
+      "enableWizardTitle": "Enable Module",
+      "enableWizardSubtitle": "Follow the steps to activate this module",
+      "wizardSteps": {
+        "check": "Check Schema",
+        "initialize": "Initialize",
+        "demoData": "Demo Data",
+        "enable": "Enable"
+      },
+      "checkTitle": "Schema Verification",
+      "checkDescription": "Checking if all required database tables exist for this module.",
+      "initTitle": "Initialize Database Schema",
+      "demoTitle": "Load Demo Data (Optional)",
+      "enableTitle": "Activate Module"
+    },
     "settings": {
       "pageTitle": "Platform Admin - Settings",
       "subtitle": "Global configuration — App Admin only",

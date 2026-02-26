@@ -22,6 +22,11 @@ export { default as LoadingSpinner } from '@shared/components/LoadingSpinner';
 export { default as SettingsModal } from '@shared/components/SettingsModal';
 export { default as LoginForm } from '@shared/components/LoginForm';
 export { default as StatusTile } from '@shared/components/StatusTile';
+export { default as Modal } from '@shared/components/Modal';
+export { default as SettingsConfig } from '@shared/components/SettingsConfig';
+
+// --- Wizards ---
+export { default as StepWizard } from '@shared/components/wizards/StepWizard';
 
 // --- Layouts ---
 export { default as ModuleLayout } from '@shared/components/layouts/ModuleLayout';
@@ -33,6 +38,7 @@ export { default as RightPanel } from '@shared/components/layouts/RightPanel';
 export { default as Logger } from '@shared/services/logger';
 export { default as ApiClient } from '@shared/services/apiClient';
 export { default as AuthService } from '@shared/services/authService';
+export { default as ModuleService } from '@shared/services/moduleService';
 
 // --- Demo Data ---
 export { loadRosterDemo } from '@shared/services/demoDataService';

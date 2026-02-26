@@ -1,25 +1,38 @@
 // ============================================================================
 // PlatformDashboard — PulseOps UI
 //
-// PURPOSE: Platform Admin module root component. Orchestrates the admin
-// dashboard with sidebar navigation and multiple views: Overview, Users,
-// Logs, and Settings (with 4 sub-tabs). Uses AppShell for the unified layout.
+// PURPOSE: Root orchestrator for the authenticated application. Manages
+// module switching, sidebar navigation, and view rendering. Fetches
+// enabled modules from the database (via /api/modules) to drive the
+// TopNav dynamically — disabled modules are hidden.
 //
 // ARCHITECTURE: Thin orchestrator — delegates all view rendering to
-// dedicated view components in ./views/. SideNav items driven by
-// uiElementsText.json. No inline text or hardcoded UI strings.
+// dedicated view components. Module list is fetched from the DB on mount
+// and refreshed when modules are enabled/disabled. This ensures the
+// navigation survives Kubernetes pod restarts.
+//
+// USED BY:
+//   - App.jsx → renders when user is authenticated
+//
+// INTEGRATION FLOW:
+//   App.jsx authenticates → PlatformDashboard mounts →
+//   fetches modules from DB → builds TopNav + SideNav →
+//   renders active module view
 // ============================================================================
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   LayoutDashboard, Users, ScrollText, Settings as SettingsIcon,
-  Database, Shield, Layers
+  Database, Shield, Layers, Package, Calendar,
+  BarChart3, Sliders
 } from 'lucide-react';
 import AppShell from '@core/AppShell';
-import { getModulesForRole } from '@modules/moduleRegistry';
+import { SettingsConfig } from '@shared';
 import Logger from '@shared/services/logger';
+import ModuleService from '@shared/services/moduleService';
 import uiText from '@shared/config/uiElementsText.json';
 import appConfig from '@shared/config/app.json';
 import AdminOverview from '@modules/admin/views/AdminOverview';
+import ModulesPage from '@modules/admin/views/ModulesPage';
 import LogsViewer from '@modules/admin/views/LogsViewer';
 import SettingsDatabase from '@modules/admin/views/SettingsDatabase';
 import SettingsDbObjects from '@modules/admin/views/SettingsDbObjects';
@@ -27,128 +40,137 @@ import SettingsAuth from '@modules/admin/views/SettingsAuth';
 import SettingsLogging from '@modules/admin/views/SettingsLogging';
 import ShiftRosterApp from '@modules/roster/ShiftRosterApp';
 
-const navTxt = uiText.platformAdmin.navItems;
 const settingsTxt = uiText.platformAdmin.settings;
 
+const MODULE_ICON_MAP = {
+  Shield, Calendar, Package, LayoutDashboard,
+};
+
 const ADMIN_NAV_ITEMS = [
-  { id: 'overview', label: navTxt.overview,  icon: LayoutDashboard },
-  { id: 'users',    label: navTxt.users,     icon: Users },
-  { id: 'logs',     label: navTxt.logs,      icon: ScrollText },
-  { id: 'settings', label: navTxt.settings,  icon: SettingsIcon },
+  { id: 'overview', label: uiText.platformAdmin.navItems.overview, icon: LayoutDashboard },
+  { id: 'modules', label: uiText.platformAdmin.navItems.modules, icon: Package },
+  { id: 'users', label: uiText.platformAdmin.navItems.users, icon: Users },
+  { id: 'logs', label: uiText.platformAdmin.navItems.logs, icon: ScrollText },
+  { id: 'settings', label: uiText.platformAdmin.navItems.settings, icon: SettingsIcon },
 ];
 
-const SETTINGS_TABS = [
-  { id: 'settings_db',      label: settingsTxt.tabs.database,       icon: Database },
-  { id: 'settings_objects', label: settingsTxt.tabs.dbObjects,      icon: Layers },
-  { id: 'settings_auth',    label: settingsTxt.tabs.authentication, icon: Shield },
-  { id: 'settings_logging', label: settingsTxt.tabs.logging,        icon: ScrollText },
+const ROSTER_NAV_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard', icon: Calendar },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
+  { id: 'config', label: 'Configuration', icon: Sliders },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 export default function PlatformDashboard({ user, onLogout }) {
-  const availableModules = useMemo(() => getModulesForRole(user?.role || 'admin'), [user?.role]);
+  const [dbModules, setDbModules] = useState([]);
   const [activeModuleId, setActiveModuleId] = useState('platform_admin');
   const [activeView, setActiveView] = useState('overview');
-  const [settingsTab, setSettingsTab] = useState('settings_db');
+
+  // Fetch modules from database on mount
+  const fetchModules = useCallback(async () => {
+    try {
+      const data = await ModuleService.getAll();
+      setDbModules(data);
+    } catch (err) {
+      Logger.error('PlatformDashboard', 'Failed to fetch modules', { error: err.message });
+    }
+  }, []);
+
+  useEffect(() => { fetchModules(); }, [fetchModules]);
+
+  // Build TopNav module list from DB — only enabled modules for this role
+  const availableModules = useMemo(() => {
+    return dbModules
+      .filter(m => m.enabled && (m.roles || []).includes(user?.role || 'user'))
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(m => ({
+        id: m.moduleId,
+        name: m.name,
+        shortName: m.name,
+        description: m.description,
+        icon: MODULE_ICON_MAP[m.moduleId === 'platform_admin' ? 'Shield' : 'Calendar'] || Package,
+        roles: m.roles,
+        enabled: m.enabled,
+        order: m.order,
+      }));
+  }, [dbModules, user?.role]);
+
+  // Get navItems for active module
+  const sideNavItems = useMemo(() => {
+    if (activeModuleId === 'platform_admin') return ADMIN_NAV_ITEMS;
+    if (activeModuleId === 'shiftroaster') return ROSTER_NAV_ITEMS;
+    return [];
+  }, [activeModuleId]);
 
   const handleSwitchModule = useCallback((moduleId) => {
     setActiveModuleId(moduleId);
     if (moduleId === 'platform_admin') {
       setActiveView('overview');
-    }
-  }, []);
-
-  const handleNavSelect = useCallback((id) => {
-    setActiveView(id);
-    if (id === 'settings') {
-      setSettingsTab('settings_db');
+    } else if (moduleId === 'shiftroaster') {
+      setActiveView('dashboard');
     }
   }, []);
 
   const handleSideNavSelect = useCallback((id) => {
     setActiveView(id);
-    if (id === 'settings' && !settingsTab.startsWith('settings_')) {
-      setSettingsTab('settings_db');
-    }
-  }, [settingsTab]);
+  }, []);
 
   const renderSettingsView = () => {
+    const tabs = [
+      { id: 'settings_db', label: settingsTxt.tabs.database, icon: Database, content: <SettingsDatabase /> },
+      { id: 'settings_objects', label: settingsTxt.tabs.dbObjects, icon: Layers, content: <SettingsDbObjects /> },
+      { id: 'settings_auth', label: settingsTxt.tabs.authentication, icon: Shield, content: <SettingsAuth /> },
+      { id: 'settings_logging', label: settingsTxt.tabs.logging, icon: ScrollText, content: <SettingsLogging /> },
+    ];
     return (
-      <div className="flex h-full gap-8 animate-fade-in items-start">
-        {/* Settings Sub-navigation */}
-        <div className="w-64 shrink-0 sticky top-0">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-surface-900">{settingsTxt.pageTitle}</h2>
-            <p className="text-sm text-surface-500 mt-1">{settingsTxt.subtitle}</p>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {SETTINGS_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = settingsTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setSettingsTab(tab.id)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                    isActive 
-                      ? 'bg-white text-brand-700 shadow-sm border border-surface-200' 
-                      : 'text-surface-600 hover:bg-surface-200/50 hover:text-surface-900 border border-transparent'
-                  }`}
-                >
-                  <Icon size={18} className={isActive ? 'text-brand-600' : 'text-surface-400'} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Settings Content */}
-        <div className="flex-1 min-w-0 bg-white rounded-2xl border border-surface-200 shadow-sm p-8">
-          {settingsTab === 'settings_db' && <SettingsDatabase />}
-          {settingsTab === 'settings_objects' && <SettingsDbObjects />}
-          {settingsTab === 'settings_auth' && <SettingsAuth />}
-          {settingsTab === 'settings_logging' && <SettingsLogging />}
-        </div>
-      </div>
+      <SettingsConfig
+        title={settingsTxt.pageTitle}
+        subtitle={settingsTxt.subtitle}
+        icon={SettingsIcon}
+        tabs={tabs}
+        defaultTab="settings_db"
+      />
     );
   };
 
   const renderAdminView = () => {
     switch (activeView) {
-      case 'overview': return <AdminOverview user={user} onNavigate={handleNavSelect} />;
+      case 'overview': return <AdminOverview user={user} onNavigate={handleSideNavSelect} />;
+      case 'modules':  return <ModulesPage onModulesChanged={fetchModules} />;
       case 'users':    return <UsersPlaceholder />;
       case 'logs':     return <LogsViewer />;
       case 'settings': return renderSettingsView();
-      default:         return <AdminOverview user={user} onNavigate={handleNavSelect} />;
+      default:         return <AdminOverview user={user} onNavigate={handleSideNavSelect} />;
     }
   };
 
-  const renderModuleContent = () => {
-    return (
-      <AppShell
-        appName={appConfig.appName || 'PulseOps'}
-        modules={availableModules}
-        activeModuleId={activeModuleId}
-        onSwitchModule={handleSwitchModule}
-        onLogout={onLogout}
-        onSystemAdmin={() => { setActiveView('overview'); }}
-        user={user}
-        sideNavTitle={uiText.platformAdmin.sideNav.title}
-        sideNavItems={ADMIN_NAV_ITEMS}
-        activeSideNavItemId={activeView}
-        onSelectSideNavItem={handleSideNavSelect}
-        logger={Logger}
-      >
-        {activeModuleId === 'shift_roster' ? (
-          <ShiftRosterApp />
-        ) : (
-          renderAdminView()
-        )}
-      </AppShell>
-    );
-  };
+  const activeModuleName = useMemo(() => {
+    const mod = availableModules.find(m => m.id === activeModuleId);
+    return mod?.name || 'Admin';
+  }, [availableModules, activeModuleId]);
 
-  return renderModuleContent();
+  return (
+    <AppShell
+      appName={appConfig.appName || 'PulseOps'}
+      modules={availableModules}
+      activeModuleId={activeModuleId}
+      onSwitchModule={handleSwitchModule}
+      onLogout={onLogout}
+      onSystemAdmin={() => { handleSwitchModule('platform_admin'); }}
+      user={user}
+      sideNavTitle={activeModuleName}
+      sideNavItems={sideNavItems}
+      activeSideNavItemId={activeView}
+      onSelectSideNavItem={handleSideNavSelect}
+      logger={Logger}
+    >
+      {activeModuleId === 'shiftroaster' ? (
+        <ShiftRosterApp activeTab={activeView} onTabChange={setActiveView} />
+      ) : (
+        renderAdminView()
+      )}
+    </AppShell>
+  );
 }
 
 function UsersPlaceholder() {
@@ -158,8 +180,7 @@ function UsersPlaceholder() {
         <Users size={48} className="text-surface-300 mb-4" />
         <h3 className="text-xl font-bold text-surface-800 mb-2">User Management</h3>
         <p className="text-surface-500 text-sm text-center max-w-md">
-          User CRUD operations will be available once the backend API is connected.
-          Users are managed in the PostgreSQL database.
+          Full user CRUD operations with role assignment and status management.
         </p>
       </div>
     </div>

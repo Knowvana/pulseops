@@ -1,44 +1,60 @@
 // ============================================================================
-// Module Registry — PulseOps UI
+// Module Registry — PulseOps UI (FALLBACK ONLY)
 //
-// PURPOSE: Central registry of all available modules. Drives the global
-// navigation dynamically — no hardcoded module lists anywhere else.
-// Each module exports a manifest with id, name, icon, component, and
-// allowed roles. The registry filters modules by user role.
+// PURPOSE: Static fallback module registry. The PRIMARY source of module
+// data is now the database (system_modules table), fetched via the
+// ModuleService → /api/modules endpoint in PlatformDashboard.jsx.
 //
-// ARCHITECTURE: Singleton registry. Modules self-register their manifests.
-// The AppShell reads from this registry to build navigation. Role-based
-// access is enforced here — users only see modules they have access to.
+// This file serves as a FALLBACK if the API is unavailable during
+// initial load or for offline development. It is NOT the source of
+// truth for navigation — that is the database.
 //
-// USAGE:
-//   import { getModulesForRole } from '@modules/moduleRegistry';
-//   const modules = getModulesForRole('admin');
+// ARCHITECTURE: PlatformDashboard.jsx fetches modules from the DB on
+// mount via ModuleService.getAll(). The TopNav is driven by that data.
+// This file is only used as a reference for module IDs and defaults.
+//
+// IMPORTANT: Module IDs here MUST match the moduleId in
+// pulseops-api/src/config/modules.json exactly.
 // ============================================================================
-import { Calendar, Shield } from 'lucide-react';
+import { Calendar, Shield, LayoutDashboard, Users, ScrollText, Settings as SettingsIcon, BarChart3, Sliders, Package } from 'lucide-react';
 
 const MODULE_MANIFESTS = [
-  {
-    id: 'shift_roster',
-    name: 'Shift Roster Planner',
-    shortName: 'Roster',
-    description: 'Workforce scheduling, shift allocation, and compliance reporting',
-    icon: Calendar,
-    roles: ['admin', 'manager', 'user'],
-    enabled: true,
-    order: 1,
-    // Lazy-loaded component reference (resolved in AppShell)
-    componentPath: 'roster/ShiftRosterApp',
-  },
   {
     id: 'platform_admin',
     name: 'Admin',
     shortName: 'Admin',
-    description: 'System overview, user management, settings, and logs',
+    description: 'System overview, user management, module management, settings, and logs',
     icon: Shield,
     roles: ['admin'],
     enabled: true,
+    isCore: true,
     order: 0,
     componentPath: 'admin/PlatformDashboard',
+    navItems: [
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+      { id: 'modules', label: 'Modules', icon: Package },
+      { id: 'users', label: 'Users', icon: Users },
+      { id: 'logs', label: 'Logs', icon: ScrollText },
+      { id: 'settings', label: 'Settings', icon: SettingsIcon },
+    ],
+  },
+  {
+    id: 'shiftroaster',
+    name: 'Shift Roaster',
+    shortName: 'Roster',
+    description: 'Workforce scheduling, shift allocation, compliance reporting, and resource management',
+    icon: Calendar,
+    roles: ['admin', 'manager', 'user'],
+    enabled: false,
+    isCore: false,
+    order: 1,
+    componentPath: 'roster/ShiftRosterApp',
+    navItems: [
+      { id: 'dashboard', label: 'Dashboard', icon: Calendar },
+      { id: 'reports', label: 'Reports', icon: BarChart3 },
+      { id: 'config', label: 'Configuration', icon: Sliders },
+      { id: 'settings', label: 'Settings', icon: SettingsIcon },
+    ],
   },
 ];
 

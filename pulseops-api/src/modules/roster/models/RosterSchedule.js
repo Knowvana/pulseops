@@ -37,7 +37,7 @@ const RosterSchedule = sequelize.define('RosterSchedule', {
     allowNull: true,
   },
 }, {
-  tableName: 'roster_schedules',
+  tableName: 'shiftroaster_schedules',
   timestamps: true,
   indexes: [
     { unique: true, fields: ['year', 'month'] },

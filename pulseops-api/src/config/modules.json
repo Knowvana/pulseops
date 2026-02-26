@@ -1,0 +1,52 @@
+{
+  "modules": [
+    {
+      "moduleId": "platform_admin",
+      "name": "Admin",
+      "description": "Core platform administration — system overview, user management, module management, settings, and logs",
+      "version": "1.0.0",
+      "isCore": true,
+      "enabled": true,
+      "initialized": true,
+      "order": 0,
+      "icon": "Shield",
+      "roles": ["admin"],
+      "requiredTables": ["system_users", "system_config", "system_logs", "system_modules"],
+      "schemaVersion": "1.0.0"
+    },
+    {
+      "moduleId": "shiftroaster",
+      "name": "Shift Roaster",
+      "description": "Workforce scheduling, shift allocation, compliance reporting, and resource management",
+      "version": "1.0.0",
+      "isCore": false,
+      "enabled": false,
+      "initialized": false,
+      "order": 1,
+      "icon": "Calendar",
+      "roles": ["admin", "manager", "user"],
+      "requiredTables": ["shiftroaster_config", "shiftroaster_schedules", "shiftroaster_shifts", "shiftroaster_employees", "shiftroaster_leaves"],
+      "schemaVersion": "1.0.0"
+    }
+  ],
+  "roles": {
+    "platform_admin": {
+      "id": "admin",
+      "label": "Platform Admin",
+      "description": "Full platform access including settings, user management, and all modules",
+      "level": 100
+    },
+    "module_admin": {
+      "id": "manager",
+      "label": "Module Admin",
+      "description": "Module-level administration — configure and manage assigned modules",
+      "level": 50
+    },
+    "user": {
+      "id": "user",
+      "label": "User",
+      "description": "Standard user access to assigned modules only",
+      "level": 10
+    }
+  }
+}

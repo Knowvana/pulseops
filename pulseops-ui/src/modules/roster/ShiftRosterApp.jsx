@@ -1,36 +1,40 @@
 // ============================================================================
-// ShiftRosterApp — PulseOps UI
+// ShiftRosterApp — PulseOps UI (ShiftRoaster Module)
 //
-// PURPOSE: Root component for the Shift Roster Planner module. Manages all
-// roster state (employees, shifts, leaves, schedule) and orchestrates the
-// sub-components (Dashboard, Config, Reports, Settings).
+// PURPOSE: Root component for the ShiftRoaster module. Manages all roster
+// state (employees, shifts, leaves, schedule) and orchestrates the
+// sub-components (Dashboard, Config, Reports, Settings). Includes a
+// current shift header bar showing live shift details.
 //
-// ARCHITECTURE: Self-contained module. Uses ModuleLayout for consistent
-// sidebar navigation. Uses ConfirmationModal + useConfirmAction hook for
-// destructive actions. All demo data comes from demoDataService.
-// Exports as default — registered in moduleRegistry.js.
+// ARCHITECTURE: Pure content component. Navigation is managed by parent
+// PlatformDashboard via activeTab/onTabChange props. Data is fetched
+// from the API (shiftroaster_* tables) and persisted to the database.
+// Settings view uses the universal SettingsConfig component.
+//
+// USED BY:
+//   - PlatformDashboard.jsx → renders when activeModuleId === 'shiftroaster'
+//
+// INTEGRATION FLOW:
+//   PlatformDashboard switches to shiftroaster → ShiftRosterApp mounts →
+//   fetches current shift from API → renders header + active tab view
 // ============================================================================
-import React, { useState, useCallback } from 'react';
-import { Calendar, BarChart3, Settings as SettingsIcon, Sliders } from 'lucide-react';
-import { ModuleLayout, ConfirmationModal, EmptyState, SettingsModal, Logger, loadRosterDemo } from '@shared';
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  Calendar, Settings as SettingsIcon, Clock, Users as UsersIcon,
+  UserCheck, Timer, Database, Trash2
+} from 'lucide-react';
+import { ConfirmationModal, EmptyState, SettingsConfig, Logger, ApiClient, loadRosterDemo } from '@shared';
 import logsConfig from '@shared/config/logs.json';
 import uiText from '@shared/config/uiElementsText.json';
 import messages from '@shared/config/messages.json';
+import urls from '@shared/config/urls.json';
 import RosterDashboard from '@modules/roster/components/RosterDashboard';
 import RosterConfig from '@modules/roster/components/RosterConfig';
 import RosterReports from '@modules/roster/components/RosterReports';
 import RosterSettings from '@modules/roster/components/RosterSettings';
 import { generateRoster, getSafeDateKey } from '@modules/roster/utils/rosterUtils';
 
-const rosterTxt = uiText.shiftRoster;
-
-const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Planner', icon: Calendar },
-  { id: 'reports', label: 'Reports', icon: BarChart3 },
-  { id: 'config', label: 'Configuration', icon: Sliders },
-];
-
-export default function ShiftRosterApp() {
+export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange }) {
   // --- Core Roster State ---
   const [employees, setEmployees] = useState([]);
   const [shifts, setShifts] = useState([]);
@@ -38,16 +42,56 @@ export default function ShiftRosterApp() {
   const [schedule, setSchedule] = useState(null);
   const [generationError, setGenerationError] = useState(null);
 
+  // --- Current Shift Header State ---
+  const [currentShiftInfo, setCurrentShiftInfo] = useState(null);
+  const [shiftTimeLeft, setShiftTimeLeft] = useState('');
+
   // --- Navigation & View ---
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [viewMode, setViewMode] = useState('month');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [showSettings, setShowSettings] = useState(false);
 
   // --- Confirmation Modal ---
   const [confirmAction, setConfirmAction] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processSuccess, setProcessSuccess] = useState(false);
+
+  // --- Fetch current shift info from API ---
+  useEffect(() => {
+    const fetchCurrentShift = async () => {
+      try {
+        const response = await ApiClient.get(urls.rosterCurrentShiftEndpoint);
+        if (response?.data) setCurrentShiftInfo(response.data);
+      } catch {
+        // Module may not be initialized yet
+      }
+    };
+    fetchCurrentShift();
+    const interval = setInterval(fetchCurrentShift, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // --- Countdown timer for shift end ---
+  useEffect(() => {
+    if (!currentShiftInfo?.currentShift?.endTime) {
+      setShiftTimeLeft('');
+      return;
+    }
+    const updateCountdown = () => {
+      const now = new Date();
+      const [endH, endM] = currentShiftInfo.currentShift.endTime.split(':').map(Number);
+      let endDate = new Date(now);
+      endDate.setHours(endH, endM, 0, 0);
+      if (endDate <= now) endDate.setDate(endDate.getDate() + 1);
+      const diffMs = endDate - now;
+      const hours = Math.floor(diffMs / 3600000);
+      const mins = Math.floor((diffMs % 3600000) / 60000);
+      const secs = Math.floor((diffMs % 60000) / 1000);
+      setShiftTimeLeft(`${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [currentShiftInfo]);
 
   // --- Date Navigation ---
   const navigateDate = useCallback((direction) => {
@@ -80,7 +124,7 @@ export default function ShiftRosterApp() {
       Logger.warn('ShiftRoster', logsConfig.messages.roster.generationFailed, { employees: employees.length, shifts: shifts.length });
       return;
     }
-    const totalWeekdaySlots = shifts.reduce((sum, s) => sum + s.reqWeekday, 0);
+    const totalWeekdaySlots = shifts.reduce((sum, s) => sum + (s.reqWeekday || 1), 0);
     if (totalWeekdaySlots > employees.length) {
       setGenerationError(`Not enough employees (${employees.length}) to fill ${totalWeekdaySlots} weekday slots across all shifts.`);
       Logger.warn('ShiftRoster', logsConfig.messages.roster.generationFailed, { employees: employees.length, totalWeekdaySlots });
@@ -149,25 +193,36 @@ export default function ShiftRosterApp() {
   const handleSuccessClose = useCallback(() => {
     setConfirmAction(null);
     setProcessSuccess(false);
-    setActiveTab('dashboard');
-  }, []);
+    if (onTabChange) onTabChange('dashboard');
+  }, [onTabChange]);
 
   const handleCancelAction = useCallback(() => {
     setConfirmAction(null);
     setProcessSuccess(false);
   }, []);
 
-  // --- Tab change handler ---
-  const handleTabChange = useCallback((tab) => {
-    if (tab === 'settings') {
-      setShowSettings(true);
-    } else {
-      setActiveTab(tab);
-    }
-  }, []);
-
-  // --- Check if roster has data ---
   const hasData = employees.length > 0 || shifts.length > 0;
+
+  // --- Settings View (uses universal SettingsConfig) ---
+  const renderSettingsView = () => {
+    const tabs = [
+      {
+        id: 'data',
+        label: 'Data Management',
+        icon: Database,
+        content: <RosterSettings onDataAction={(action) => handleDataAction(action)} />,
+      },
+    ];
+    return (
+      <SettingsConfig
+        title="Shift Roaster Settings"
+        subtitle="Module configuration and data management"
+        icon={SettingsIcon}
+        tabs={tabs}
+        defaultTab="data"
+      />
+    );
+  };
 
   // --- Render content based on active tab ---
   const renderContent = () => {
@@ -175,7 +230,7 @@ export default function ShiftRosterApp() {
       return (
         <EmptyState
           module="roster_planner"
-          onPrimaryAction={() => setActiveTab('config')}
+          onPrimaryAction={() => onTabChange?.('config')}
           onSecondaryAction={() => handleDataAction({ type: 'load_demo', title: 'Load Demo Data', desc: messages.confirm.loadDemoData })}
         />
       );
@@ -224,20 +279,75 @@ export default function ShiftRosterApp() {
             setLeaves={setLeaves}
           />
         );
+      case 'settings':
+        return renderSettingsView();
       default:
         return null;
     }
   };
 
+  const cs = currentShiftInfo;
+
   return (
-    <ModuleLayout
-      title={rosterTxt.sideNav.title}
-      subtitle={rosterTxt.sideNav.subtitle}
-      icon={Calendar}
-      navItems={NAV_ITEMS}
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-    >
+    <div className="space-y-4 animate-fade-in">
+      {/* ─── Current Shift Header Bar ─────────────────────────────────── */}
+      {cs?.currentShift && (
+        <div className="bg-gradient-to-r from-brand-600 via-teal-600 to-brand-700 rounded-2xl p-4 text-white shadow-lg shadow-brand-600/20 flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+              <Clock size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Current Shift</p>
+              <p className="text-lg font-extrabold">{cs.currentShift.label}</p>
+            </div>
+          </div>
+
+          <div className="h-8 w-px bg-white/20 hidden md:block" />
+
+          <div className="flex items-center gap-2">
+            <Calendar size={14} className="text-white/70" />
+            <span className="text-sm font-semibold">{cs.currentShift.startTime} — {cs.currentShift.endTime}</span>
+          </div>
+
+          <div className="h-8 w-px bg-white/20 hidden md:block" />
+
+          {shiftTimeLeft && (
+            <div className="flex items-center gap-2">
+              <Timer size={14} className="text-white/70" />
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Time Left</p>
+                <p className="text-lg font-extrabold font-mono tracking-wider">{shiftTimeLeft}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="h-8 w-px bg-white/20 hidden md:block" />
+
+          <div className="flex items-center gap-2">
+            <UsersIcon size={14} className="text-white/70" />
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Resources Available</p>
+              <p className="text-lg font-extrabold">{cs.availableResources ?? '—'} / {cs.totalEmployees ?? '—'}</p>
+            </div>
+          </div>
+
+          {cs.shiftLead && (
+            <>
+              <div className="h-8 w-px bg-white/20 hidden md:block" />
+              <div className="flex items-center gap-2">
+                <UserCheck size={14} className="text-white/70" />
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Shift Lead</p>
+                  <p className="text-sm font-bold">{cs.shiftLead}</p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ─── Active Tab Content ───────────────────────────────────────── */}
       {renderContent()}
 
       {/* Confirmation Modal Overlay */}
@@ -249,20 +359,6 @@ export default function ShiftRosterApp() {
         onCancel={handleCancelAction}
         onSuccessClose={handleSuccessClose}
       />
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        title="Roster Settings"
-        icon={SettingsIcon}
-        tabs={[
-          { id: 'data', label: 'Data Management', icon: SettingsIcon },
-        ]}
-        initialTab="data"
-      >
-        {(tab) => tab === 'data' && <RosterSettings onDataAction={(action) => { setShowSettings(false); handleDataAction(action); }} />}
-      </SettingsModal>
-    </ModuleLayout>
+    </div>
   );
 }

@@ -48,6 +48,18 @@
       "configSaved": "Roster configuration saved",
       "configLoaded": "Roster configuration loaded"
     },
+    "modules": {
+      "initializing": "Initializing module schema: {moduleId}",
+      "initialized": "Module schema initialized: {moduleId}",
+      "enabled": "Module enabled: {moduleId}",
+      "disabled": "Module disabled: {moduleId}",
+      "demoDataLoaded": "Demo data loaded for module: {moduleId}",
+      "dataWiped": "Module data wiped: {moduleId}",
+      "schemaLoadFailed": "Failed to load schema for module: {moduleId}",
+      "seedingModules": "Seeding default module records",
+      "modulesSeedComplete": "Module records seeded successfully",
+      "statusChecked": "Module status checked: {moduleId}"
+    },
     "middleware": {
       "rateLimitHit": "Rate limit exceeded for IP {ip}",
       "corsBlocked": "CORS blocked request from {origin}",

@@ -14,7 +14,7 @@
 // ============================================================================
 import { Router } from 'express';
 import sequelize, { testConnection } from '../database/sequelize.js';
-import models, { User, SystemConfig, RosterSchedule, RosterConfig } from '../database/models/index.js';
+import models, { User, SystemConfig, SystemModule, RosterSchedule, RosterConfig } from '../database/models/index.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import logger, { logMessages } from '../logger.js';
 import { createRequire } from 'module';
@@ -68,7 +68,7 @@ router.get('/schema-status', authenticate, authorize('admin'), async (req, res, 
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
     );
     const tableNames = results.map(r => r.table_name);
-    const requiredTables = ['users', 'system_config', 'roster_schedules', 'roster_config'];
+    const requiredTables = ['system_users', 'system_config', 'system_logs', 'system_modules'];
     const initialized = requiredTables.every(t => tableNames.includes(t));
 
     let hasDefaultData = false;
@@ -279,6 +279,8 @@ router.post('/wipe', authenticate, authorize('admin'), async (req, res, next) =>
     await RosterSchedule.destroy({ where: {}, truncate: true, cascade: true });
     await RosterConfig.destroy({ where: {}, truncate: true, cascade: true });
     await SystemConfig.destroy({ where: {}, truncate: true, cascade: true });
+    // Reset non-core modules to disabled/uninitialized (preserve registry records)
+    await SystemModule.update({ enabled: false, initialized: false }, { where: { isCore: false } });
     await User.destroy({ where: {}, truncate: true, cascade: true });
     logger.info(logMessages.database.wipeComplete);
     res.json({ success: true, data: { message: 'All data wiped successfully' } });
