@@ -22,6 +22,7 @@
 // ============================================================================
 import sequelize from '#core/database/sequelize.js';
 import logger, { logMessages } from '#core/logger.js';
+import queryService from '#core/database/queryService.js';
 import { createRequire } from 'module';
 
 // Import all module models (this registers them with Sequelize)
@@ -50,14 +51,28 @@ export async function createSchema() {
   try {
     logger.info(logMessages.database.syncing + ' (ShiftRoaster module)');
 
-    await ShiftRoasterShift.sync({ alter: true });
-    await ShiftRoasterEmployee.sync({ alter: true });
-    await ShiftRoasterLeave.sync({ alter: true });
-    await RosterSchedule.sync({ alter: true });
-    await RosterConfig.sync({ alter: true });
+    const models = [
+      ShiftRoasterShift,
+      ShiftRoasterEmployee,
+      ShiftRoasterLeave,
+      RosterSchedule,
+      RosterConfig,
+    ];
+
+    for (const model of models) {
+      await model.sync({ alter: true });
+    }
 
     logger.info(logMessages.database.schemaCreated + ' (ShiftRoaster module)');
-    return { success: true, tables: REQUIRED_TABLES };
+
+    const schema = queryService.getSchema();
+    return {
+      success: true,
+      message: 'Module schema created successfully',
+      schema,
+      tables: REQUIRED_TABLES,
+      tableCount: REQUIRED_TABLES.length,
+    };
   } catch (err) {
     logger.error(logMessages.database.syncFailed + ' (ShiftRoaster module)', { error: err.message });
     throw err;
@@ -70,10 +85,7 @@ export async function createSchema() {
  */
 export async function verifySchema() {
   try {
-    const [results] = await sequelize.query(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
-    );
-    const tableNames = results.map(r => r.table_name);
+    const tableNames = await queryService.getTablesBySchema();
     const existing = REQUIRED_TABLES.filter(t => tableNames.includes(t));
     const missing = REQUIRED_TABLES.filter(t => !tableNames.includes(t));
 
@@ -131,9 +143,13 @@ export async function loadDemoData() {
     }
 
     logger.info(logMessages.database.seedComplete + ' (ShiftRoaster module)', shiftCounts);
-    return { success: true, counts: shiftCounts };
+    return {
+      success: true,
+      message: 'Demo data loaded successfully',
+      counts: shiftCounts,
+    };
   } catch (err) {
-    logger.error('Failed to load ShiftRoaster demo data', { error: err.message });
+    logger.error(logMessages.database.syncFailed + ' (ShiftRoaster demo data)', { error: err.message });
     throw err;
   }
 }

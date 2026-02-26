@@ -33,6 +33,7 @@ import { Router } from 'express';
 import { authenticate, authorize } from '#core/middleware/auth.js';
 import { SystemModule } from '#core/database/models/index.js';
 import logger, { msg, logMessages } from '#core/logger.js';
+import queryService from '#core/database/queryService.js';
 
 const router = Router();
 
@@ -70,11 +71,36 @@ router.get('/', authenticate, async (req, res, next) => {
   try {
     const modules = await SystemModule.findAll({ order: [['order', 'ASC']] });
 
+    // Real-time schema verification: check actual DB tables
+    let existingTables = [];
+    try {
+      existingTables = await queryService.getTablesBySchema();
+    } catch (_) {}
+
+    const enriched = modules.map(m => {
+      const required = m.requiredTables || [];
+      const existing = required.filter(t => existingTables.includes(t));
+      const missing = required.filter(t => !existingTables.includes(t));
+      const schemaValid = required.length > 0 && missing.length === 0;
+
+      // Auto-correct stale initialized flag if tables are gone
+      if (m.initialized && !schemaValid && !m.isCore) {
+        m.initialized = false;
+        m.save().catch(() => {});
+      }
+
+      const plain = m.toJSON ? m.toJSON() : { ...m };
+      plain.schemaValid = schemaValid;
+      plain.existingTables = existing;
+      plain.missingTables = missing;
+      return plain;
+    });
+
     // Filter by user role for non-admins
     const userRole = req.user.role;
     const filtered = userRole === 'admin'
-      ? modules
-      : modules.filter(m => m.enabled && m.roles.includes(userRole));
+      ? enriched
+      : enriched.filter(m => m.enabled && (m.roles || []).includes(userRole));
 
     res.json({ success: true, data: filtered });
   } catch (err) { next(err); }

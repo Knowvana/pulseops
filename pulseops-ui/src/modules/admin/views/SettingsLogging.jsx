@@ -104,7 +104,7 @@ export default function SettingsLogging() {
         <div className="flex gap-6">
           
           {/* Log Level */}
-          <div className="flex-1">
+          <div className="flex-[4]">
             <h5 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3 text-center">{txt.logLevel.title}</h5>
             <p className="text-xs text-surface-500 mb-3 text-center">{txt.logLevel.description}</p>
             <div className="flex items-center gap-1">
@@ -134,7 +134,7 @@ export default function SettingsLogging() {
           <div className="w-1 bg-gradient-to-b from-transparent via-purple-400 to-transparent shadow-lg" />
 
           {/* Capture Options */}
-          <div className="flex-1 text-center">
+          <div className="flex-[6] text-center">
             <h5 className="text-xs font-bold uppercase tracking-wider text-surface-400 mb-3">Log Capture Options</h5>
             <div className="flex justify-center gap-2">
               <ToggleRow icon={Monitor} label={txt.captureOptions.consoleOutput} description={txt.captureOptions.consoleDescription} enabled={consoleOutput} onToggle={() => setConsoleOutput(!consoleOutput)} />

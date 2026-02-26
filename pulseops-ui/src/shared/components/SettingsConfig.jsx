@@ -91,7 +91,7 @@ export default function SettingsConfig({
       )}
 
       <div className="flex flex-1 min-h-0">
-        <div className="w-52 flex-shrink-0 border-r border-surface-100 bg-surface-50/30 py-3 overflow-y-auto">
+        <div className="w-64 flex-shrink-0 border-r border-surface-100 bg-surface-50/30 py-3 overflow-y-auto">
           <nav className="flex flex-col gap-0.5 px-2">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -104,7 +104,7 @@ export default function SettingsConfig({
                     flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg text-left
                     transition-all duration-150
                     ${isActive
-                      ? 'bg-white text-brand-700 shadow-sm ring-1 ring-surface-200/60 font-semibold'
+                      ? 'bg-gradient-to-r from-brand-50 to-white text-brand-700 shadow-sm ring-1 ring-surface-200/60 font-semibold'
                       : 'text-surface-500 hover:text-surface-700 hover:bg-white/60'
                     }
                   `}

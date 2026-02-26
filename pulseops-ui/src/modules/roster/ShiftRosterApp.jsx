@@ -21,7 +21,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Calendar, Settings as SettingsIcon, Clock, Users as UsersIcon,
-  UserCheck, Timer, Database, Trash2
+  UserCheck, Timer, Database, Trash2, Loader2
 } from 'lucide-react';
 import { ConfirmationModal, EmptyState, SettingsConfig, Logger, ApiClient, loadRosterDemo } from '@shared';
 import logsConfig from '@shared/config/logs.json';
@@ -55,7 +55,33 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
   const [isProcessing, setIsProcessing] = useState(false);
   const [processSuccess, setProcessSuccess] = useState(false);
 
-  // --- Fetch current shift info from API ---
+  // --- Fetch roster data from API on mount ---
+  const [dataLoading, setDataLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRosterData = async () => {
+      setDataLoading(true);
+      try {
+        const [shiftsRes, employeesRes, leavesRes, shiftRes] = await Promise.allSettled([
+          ApiClient.get(urls.rosterShiftsEndpoint),
+          ApiClient.get(urls.rosterEmployeesEndpoint),
+          ApiClient.get(urls.rosterLeavesEndpoint),
+          ApiClient.get(urls.rosterCurrentShiftEndpoint),
+        ]);
+        if (shiftsRes.status === 'fulfilled' && shiftsRes.value?.data) setShifts(shiftsRes.value.data);
+        if (employeesRes.status === 'fulfilled' && employeesRes.value?.data) setEmployees(employeesRes.value.data);
+        if (leavesRes.status === 'fulfilled' && leavesRes.value?.data) setLeaves(leavesRes.value.data);
+        if (shiftRes.status === 'fulfilled' && shiftRes.value?.data) setCurrentShiftInfo(shiftRes.value.data);
+      } catch {
+        // Module may not be initialized yet
+      } finally {
+        setDataLoading(false);
+      }
+    };
+    fetchRosterData();
+  }, []);
+
+  // --- Refresh current shift info periodically ---
   useEffect(() => {
     const fetchCurrentShift = async () => {
       try {
@@ -65,7 +91,6 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
         // Module may not be initialized yet
       }
     };
-    fetchCurrentShift();
     const interval = setInterval(fetchCurrentShift, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -226,6 +251,14 @@ export default function ShiftRosterApp({ activeTab = 'dashboard', onTabChange })
 
   // --- Render content based on active tab ---
   const renderContent = () => {
+    if (dataLoading) {
+      return (
+        <div className="flex items-center justify-center min-h-[300px]">
+          <Loader2 className="animate-spin text-brand-500" size={32} />
+        </div>
+      );
+    }
+
     if (!hasData && activeTab === 'dashboard') {
       return (
         <EmptyState

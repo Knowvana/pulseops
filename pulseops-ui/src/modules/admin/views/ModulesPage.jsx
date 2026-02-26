@@ -23,13 +23,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Calendar, CheckCircle2, XCircle, Database,
   Layers, Play, Pause, RefreshCw, Package, Search, AlertCircle,
-  Loader2, Download, Trash2
+  Loader2, Download, Trash2, Copy, Check
 } from 'lucide-react';
-import { StepWizard, ModuleService } from '@shared';
+import { StepWizard, ModuleService, ProgressModal } from '@shared';
 import Logger from '@shared/services/logger';
 import uiText from '@shared/config/uiElementsText.json';
-import logsConfig from '@shared/config/logs.json';
-import messagesConfig from '@shared/config/messages.json';
 
 const txt = uiText.platformAdmin.modules || {};
 
@@ -100,7 +98,9 @@ export default function ModulesPage({ onModulesChanged }) {
           module={selectedModule}
           schemaStatus={schemaStatus}
           onRefresh={async () => {
+            console.log('Starting schema check...');
             const status = await ModuleService.checkStatus(selectedModule.moduleId);
+            console.log('Schema check result:', status);
             setSchemaStatus(status);
           }}
           {...props}
@@ -229,12 +229,12 @@ export default function ModulesPage({ onModulesChanged }) {
                 {/* Status Tags */}
                 <div className="flex flex-wrap gap-2 mb-4">
                   <span className={`text-[11px] font-semibold px-2 py-1 rounded-md ${
-                    isInitialized
+                    mod.schemaValid
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : 'bg-amber-50 text-amber-700 border border-amber-200'
                   }`}>
                     <Database size={10} className="inline mr-1" />
-                    {isInitialized ? (txt.schemaReady || 'Schema Ready') : (txt.schemaNotReady || 'Schema Not Initialized')}
+                    {mod.schemaValid ? (txt.schemaReady || 'Schema Ready') : (txt.schemaNotReady || 'Schema Not Initialized')}
                   </span>
                   <span className="text-[11px] font-semibold px-2 py-1 rounded-md bg-surface-50 text-surface-600 border border-surface-200">
                     <Layers size={10} className="inline mr-1" />
@@ -297,6 +297,7 @@ export default function ModulesPage({ onModulesChanged }) {
 function SchemaCheckStep({ module, schemaStatus, onRefresh, onNext }) {
   const status = schemaStatus || {};
   const allReady = status.initialized;
+  const [refreshing, setRefreshing] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -331,10 +332,19 @@ function SchemaCheckStep({ module, schemaStatus, onRefresh, onNext }) {
 
       <div className="flex items-center justify-between pt-2">
         <button
-          onClick={onRefresh}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-surface-600 hover:text-surface-800 transition-colors"
+          onClick={async () => {
+            setRefreshing(true);
+            try {
+              await onRefresh();
+            } finally {
+              setRefreshing(false);
+            }
+          }}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-surface-600 hover:text-surface-800 transition-colors disabled:opacity-50"
         >
-          <RefreshCw size={14} /> Refresh
+          {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
         <button
           onClick={onNext}
@@ -343,6 +353,8 @@ function SchemaCheckStep({ module, schemaStatus, onRefresh, onNext }) {
           {allReady ? 'Skip — Already Initialized' : 'Next — Initialize Schema'}
         </button>
       </div>
+
+      <ProgressModal isOpen={refreshing} title="Refreshing..." message="Checking module schema status..." progress={50} />
     </div>
   );
 }
@@ -401,10 +413,7 @@ function SchemaInitStep({ module, schemaStatus, onStatusChange, onNext, onBack }
               </button>
             )}
             {result && (
-              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                <CheckCircle2 size={20} className="text-emerald-600" />
-                <p className="font-bold text-emerald-800 text-sm">Schema created successfully!</p>
-              </div>
+              <SchemaResultDetail result={result} moduleName={module?.name} />
             )}
             {error && (
               <div className="flex items-center gap-3 p-3 bg-rose-50 rounded-lg border border-rose-200">
@@ -475,17 +484,7 @@ function DemoDataStep({ module, onNext, onBack }) {
         )}
 
         {demoResult && (
-          <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-            <CheckCircle2 size={20} className="text-emerald-600" />
-            <div>
-              <p className="font-bold text-emerald-800 text-sm">Demo data loaded successfully!</p>
-              {demoResult.counts && (
-                <p className="text-xs text-emerald-600 mt-0.5">
-                  {demoResult.counts.shifts} shifts, {demoResult.counts.employees} employees, {demoResult.counts.leaves} leaves
-                </p>
-              )}
-            </div>
-          </div>
+          <DemoResultDetail result={demoResult} moduleName={module?.name} />
         )}
 
         {error && (
@@ -579,6 +578,108 @@ function EnableStep({ module, onComplete, onBack }) {
           <button onClick={onBack} className="px-4 py-2 text-sm font-semibold text-surface-600 hover:text-surface-800">
             ← Back
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Result Detail Components (with Copy) ───────────────────────────────────
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_) {}
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-surface-600 bg-white border border-surface-200 rounded-lg hover:bg-surface-50 active:scale-95 transition-all"
+    >
+      {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+      {copied ? 'Copied!' : 'Copy Details'}
+    </button>
+  );
+}
+
+function SchemaResultDetail({ result, moduleName }) {
+  if (!result) return null;
+
+  const tables = result.tables || [];
+  const schema = result.schema || 'public';
+  const summaryText = [
+    `Module: ${moduleName}`,
+    `Schema: ${schema}`,
+    `Tables Created: ${tables.length}`,
+    '',
+    ...tables.map(t => `  ${t} (created)`)
+  ].join('\n');
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+        <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+        <div className="flex-1">
+          <p className="font-bold text-emerald-800 text-sm">{result.message || 'Schema created successfully'}</p>
+          <p className="text-xs text-emerald-600 mt-0.5">Schema: <span className="font-mono font-bold">{schema}</span> • {tables.length} table(s)</p>
+        </div>
+        <CopyButton text={summaryText} />
+      </div>
+
+      {tables.length > 0 && (
+        <div className="max-h-48 overflow-y-auto space-y-1.5">
+          {tables.map((tableName, i) => (
+            <div key={i} className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-surface-100">
+              <Database size={12} className="text-brand-500 shrink-0" />
+              <span className="text-xs font-mono font-semibold text-surface-800">{typeof tableName === 'string' ? tableName : tableName}</span>
+              <span className="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">CREATED</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DemoResultDetail({ result, moduleName }) {
+  if (!result) return null;
+
+  const counts = result.counts || {};
+  const countEntries = Object.entries(counts).filter(([, v]) => v > 0);
+  const summaryText = [
+    `Module: ${moduleName}`,
+    `Demo Data Loaded:`,
+    ...countEntries.map(([key, val]) => `  ${key}: ${val} records`)
+  ].join('\n');
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+        <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+        <div className="flex-1">
+          <p className="font-bold text-emerald-800 text-sm">{result.message || 'Demo data loaded successfully'}</p>
+          {countEntries.length > 0 && (
+            <p className="text-xs text-emerald-600 mt-0.5">
+              {countEntries.map(([key, val]) => `${val} ${key}`).join(' • ')}
+            </p>
+          )}
+        </div>
+        <CopyButton text={summaryText} />
+      </div>
+
+      {countEntries.length > 0 && (
+        <div className="space-y-1.5">
+          {countEntries.map(([key, val]) => (
+            <div key={key} className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-surface-100">
+              <Layers size={12} className="text-teal-500 shrink-0" />
+              <span className="text-xs font-semibold text-surface-800 capitalize">{key}</span>
+              <span className="ml-auto text-[10px] font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded">{val} records</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

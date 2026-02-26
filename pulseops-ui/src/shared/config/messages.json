@@ -14,6 +14,7 @@
     "configSaveFailed": "Failed to save configuration. Please try again.",
     "authSwitchFailed": "Failed to switch authentication method.",
     "schemaInitFailed": "Schema initialization failed.",
+    "dbWipeFailed": "Database wipe failed. Check server logs.",
     "dbNotSetup": "Database is not configured or cannot be connected. Please setup the database in the Database Configuration section first."
   },
   "success": {

@@ -24,6 +24,7 @@ import models, {
 } from '#core/database/models/index.js';
 import { authenticate, authorize } from '#core/middleware/auth.js';
 import logger, { logMessages } from '#core/logger.js';
+import queryService from '#core/database/queryService.js';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -112,10 +113,7 @@ router.get('/schema-status', authenticate, authorize('admin'), async (req, res, 
       });
     }
 
-    const [results] = await sequelize.query(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
-    );
-    const tableNames = results.map(r => r.table_name);
+    const tableNames = await queryService.getTablesBySchema();
     const requiredTables = CORE_MODELS.map(m => m.tableName);
     const initialized = requiredTables.every(t => tableNames.includes(t));
 
@@ -290,9 +288,7 @@ router.get('/stats', authenticate, authorize('admin'), async (req, res, next) =>
       });
     }
 
-    const [results] = await sequelize.query(
-      "SELECT schemaname, relname AS table_name, n_live_tup AS row_count FROM pg_stat_user_tables WHERE schemaname = 'public'"
-    );
+    const results = await queryService.getTableStats();
     const tableCount = results.length;
     const totalRows = results.reduce((sum, r) => sum + parseInt(r.row_count || 0), 0);
 
@@ -440,51 +436,103 @@ router.post('/wipe', authenticate, authorize('admin'), async (req, res, next) =>
   try {
     logger.info(logMessages.database.wipeStarted);
 
-    // Get all existing tables before dropping
-    const [existingTables] = await sequelize.query(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
-    );
-    const tableNames = existingTables.map(r => r.table_name);
+    const connection = await queryService.getConnectionInfo();
+    const schema = queryService.getSchema();
 
-    if (tableNames.length === 0) {
-      return res.json({ success: true, data: { message: 'No tables to drop', droppedTables: [], droppedCount: 0 } });
+    // Only drop tables created/managed by this application.
+    // Source of truth: CORE_MODELS + modules.json requiredTables
+    const appTableNames = new Set(CORE_MODELS.map((m) => m.tableName));
+    try {
+      const modulesConfig = require('#config/modules.json');
+      for (const mod of modulesConfig?.modules || []) {
+        for (const t of mod?.requiredTables || []) {
+          appTableNames.add(t);
+        }
+      }
+    } catch (_) {}
+
+    console.log('Wipe: Looking for tables in schema:', schema);
+    console.log('Wipe: App table names to look for:', Array.from(appTableNames));
+    
+    const existingTableNames = await queryService.getTablesBySchema();
+    console.log('Wipe: Existing tables found:', existingTableNames);
+    
+    const foundTables = existingTableNames.filter((t) => appTableNames.has(t));
+    console.log('Wipe: Found app tables to drop:', foundTables);
+
+    if (foundTables.length === 0) {
+      return res.json({ success: true, data: { message: 'No tables to drop', droppedTables: [], droppedCount: 0, connection, schema } });
     }
 
-    // Drop ALL tables using CASCADE to handle foreign keys
-    await sequelize.query('SET session_replication_role = replica;');
+    // Drop tables using queryService (uses QueryTypes.RAW for DDL)
     const droppedTables = [];
-    for (const tableName of tableNames) {
+    for (const tableName of foundTables) {
       try {
-        await sequelize.query(`DROP TABLE IF EXISTS "${tableName}" CASCADE`);
+        await queryService.dropTable(tableName);
         droppedTables.push({ tableName, status: 'dropped' });
       } catch (dropErr) {
         droppedTables.push({ tableName, status: 'error', error: dropErr.message });
       }
     }
-    await sequelize.query('SET session_replication_role = DEFAULT;');
 
-    // Drop any remaining enum types
+    // Drop orphaned enum types created by Sequelize
     try {
-      const [enums] = await sequelize.query(
-        "SELECT typname FROM pg_type WHERE typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public') AND typtype = 'e'"
-      );
-      for (const e of enums) {
-        await sequelize.query(`DROP TYPE IF EXISTS "${e.typname}" CASCADE`);
+      const enums = await queryService.getEnumTypes();
+      for (const typeName of enums) {
+        await queryService.dropEnumType(typeName);
       }
     } catch (_) {}
+
+    // Verify tables are actually gone
+    const remainingTables = await queryService.getTablesBySchema();
+    const stillPresent = remainingTables.filter((t) => appTableNames.has(t));
+
+    // If tables are still present, the drop silently failed — report accurately
+    if (stillPresent.length > 0) {
+      for (const t of droppedTables) {
+        if (stillPresent.includes(t.tableName)) {
+          t.status = 'failed';
+          t.error = 'Table still exists after DROP — check database permissions';
+        }
+      }
+    }
 
     logger.info(logMessages.database.wipeComplete);
 
     res.json({
-      success: true,
+      success: stillPresent.length === 0,
       data: {
-        message: 'All database tables dropped successfully. Database is now empty.',
+        message: stillPresent.length === 0
+          ? 'All application tables dropped successfully. Database is now empty.'
+          : `Wipe partially failed — ${stillPresent.length} table(s) could not be dropped.`,
+        schema,
+        connection,
+        foundTables,
         droppedCount: droppedTables.filter(t => t.status === 'dropped').length,
         droppedTables,
+        remainingTables,
         note: 'Use Initialize Database to recreate the core schema.',
       },
     });
   } catch (err) { next(err); }
+});
+
+/**
+ * @swagger
+ * /database/test-tables:
+ *   get:
+ *     tags: [Database]
+ *     summary: DEBUG - Test getTablesBySchema query
+ *     responses:
+ *       200: { description: Tables found }
+ */
+router.get('/test-tables', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    const tables = await queryService.getTablesBySchema();
+    res.json({ success: true, data: { tables, count: tables.length } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 export default router;

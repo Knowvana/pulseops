@@ -173,11 +173,11 @@ export default function SettingsDbObjects() {
         checkStatus();
         return;
       } else {
-        throw new Error(result?.error?.message || 'Wipe failed');
+        throw new Error(result?.error?.message || messages.errors.dbWipeFailed);
       }
     } catch (err) {
       setResultModal({ open: true, title: 'Database Wipe Failed', variant: 'error', data: { message: err.message } });
-      Logger.error('Settings - DB Objects', 'Database wipe failed', { error: err.message });
+      Logger.error('Settings - DB Objects', messages.errors.dbWipeFailed, { error: err.message });
     }
     setTimeout(() => { setIsWiping(false); setWipeProgress(0); }, 300);
     checkStatus();
@@ -313,7 +313,6 @@ export default function SettingsDbObjects() {
         onCancel={() => setShowWipeConfirm(false)}
       />
 
-      {/* Result Modal — shows details of what was done */}
       <ActionModal
         isOpen={resultModal.open}
         title={resultModal.title}
@@ -321,11 +320,11 @@ export default function SettingsDbObjects() {
         size="lg"
         variant="info"
         onClose={() => setResultModal({ open: false, title: '', variant: 'info', data: null })}
+        className="w-[800px] max-h-[80vh]"
       >
         <ResultSummary data={resultModal.data} variant={resultModal.variant} />
       </ActionModal>
 
-      {/* Schema Info Modal */}
       <ActionModal
         isOpen={schemaInfoModal.open}
         title={messages.info.schemaInfoTitle}
@@ -333,6 +332,7 @@ export default function SettingsDbObjects() {
         size="lg"
         variant="info"
         onClose={() => setSchemaInfoModal({ open: false, data: null, loading: false })}
+        className="w-[1000px] max-h-[90vh]"
       >
         {schemaInfoModal.loading ? (
           <div className="flex items-center justify-center py-8"><Loader2 className="animate-spin text-brand-500" size={24} /></div>
@@ -376,37 +376,41 @@ function ResultSummary({ data, variant }) {
     <div className="space-y-3">
       {data.message && (
         <div className={`p-3 rounded-lg border ${variant === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
-          <p className={`text-sm font-semibold ${variant === 'warning' ? 'text-amber-800' : 'text-emerald-800'}`}>{data.message}</p>
+          <div className="flex items-center gap-2">
+            {variant === 'success' && <CheckCircle2 size={16} className="text-emerald-600" />}
+            <p className={`text-sm font-semibold ${variant === 'warning' ? 'text-amber-800' : 'text-emerald-800'}`}>{data.message}</p>
+          </div>
         </div>
       )}
 
       {data.note && <p className="text-xs text-surface-500 italic">{data.note}</p>}
 
-      {/* Table creation details */}
+      {/* Schema Summary */}
       {data.tables && data.tables.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-surface-600 uppercase tracking-wider">
+            Schema Summary
+          </p>
+          <div className="p-4 bg-surface-50 rounded-lg border border-surface-200 font-mono text-xs text-surface-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
+            {`Schema initialized successfully.\n\nTables created:\n${data.tables.map(t => `- ${t.tableName}: ${t.description || 'No description'}`).join('\n')}\n\nTotal tables: ${data.tables.length}`}
+          </div>
+        </div>
+      )}
+
+      {/* Found tables */}
+      {data.foundTables && data.foundTables.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-bold text-surface-600 uppercase tracking-wider">
-            {data.tablesCreated ? `${data.tablesCreated} Tables Created` : `${data.tables.length} Tables`}
+            {data.foundTables.length} Tables Found
           </p>
-          {data.tables.map((table, i) => (
-            <div key={i} className="p-3 bg-surface-50 rounded-lg border border-surface-200">
-              <div className="flex items-center gap-2 mb-1">
-                <Table2 size={12} className="text-brand-500" />
-                <span className="text-xs font-bold font-mono text-surface-800">{table.tableName || table}</span>
-                {table.status && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${table.status === 'created' ? 'bg-emerald-100 text-emerald-700' : table.status === 'dropped' ? 'bg-rose-100 text-rose-700' : 'bg-surface-100 text-surface-600'}`}>
-                    {table.status.toUpperCase()}
-                  </span>
-                )}
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {data.foundTables.map((tableName, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-surface-50 rounded-lg border border-surface-100">
+                <Table2 size={10} className="text-blue-400" />
+                <span className="text-xs font-mono text-surface-700">{tableName}</span>
               </div>
-              {table.description && <p className="text-[10px] text-surface-500">{table.description}</p>}
-              {table.columns && (
-                <p className="text-[10px] text-surface-400 mt-1">
-                  {table.columnCount || table.columns.length} columns: {(typeof table.columns[0] === 'string' ? table.columns : table.columns.map(c => c.name || c)).join(', ')}
-                </p>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
@@ -414,18 +418,60 @@ function ResultSummary({ data, variant }) {
       {data.droppedTables && data.droppedTables.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-bold text-surface-600 uppercase tracking-wider">
-            {data.droppedCount} Tables Dropped
+            {data.droppedCount ?? data.droppedTables.length} Tables Dropped
           </p>
           <div className="max-h-48 overflow-y-auto space-y-1">
-            {data.droppedTables.map((table, i) => (
+            {data.droppedTables.map((table, i) => {
+              const tableName = typeof table === 'string' ? table : table?.tableName;
+              const status = typeof table === 'string' ? 'dropped' : table?.status;
+              return (
+                <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-surface-50 rounded-lg border border-surface-100">
+                  <Trash2 size={10} className="text-rose-400" />
+                  <span className="text-xs font-mono text-surface-700">{tableName || '-'}</span>
+                  {status && (
+                    <span className={`ml-auto text-[10px] font-bold ${status === 'dropped' ? 'text-rose-600' : 'text-amber-600'}`}>
+                      {String(status).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Remaining tables after wipe (debug/verification) */}
+      {data.remainingTables && data.remainingTables.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-surface-600 uppercase tracking-wider">
+            {data.remainingTables.length} Tables Still Present
+          </p>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {data.remainingTables.map((tableName, i) => (
               <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-surface-50 rounded-lg border border-surface-100">
-                <Trash2 size={10} className="text-rose-400" />
-                <span className="text-xs font-mono text-surface-700">{table.tableName}</span>
-                <span className={`ml-auto text-[10px] font-bold ${table.status === 'dropped' ? 'text-rose-600' : 'text-amber-600'}`}>
-                  {table.status?.toUpperCase()}
-                </span>
+                <Table2 size={10} className="text-amber-400" />
+                <span className="text-xs font-mono text-surface-700">{tableName}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Connection info (debug/verification) */}
+      {data.connection && (
+        <div className="p-3 bg-surface-50 rounded-lg border border-surface-200">
+          <p className="text-xs font-bold text-surface-600 uppercase tracking-wider mb-2">Database Connection</p>
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="text-surface-500">Database</div>
+            <div className="font-mono text-surface-700">{data.connection.database ?? '-'}</div>
+            <div className="text-surface-500">Schema</div>
+            <div className="font-mono text-surface-700">{data.connection.schema ?? '-'}</div>
+            <div className="text-surface-500">Host</div>
+            <div className="font-mono text-surface-700">{data.connection.host ?? '-'}</div>
+            <div className="text-surface-500">Port</div>
+            <div className="font-mono text-surface-700">{data.connection.port ?? '-'}</div>
+            <div className="text-surface-500">User</div>
+            <div className="font-mono text-surface-700">{data.connection.user ?? '-'}</div>
           </div>
         </div>
       )}
@@ -460,28 +506,17 @@ function SchemaInfoContent({ data }) {
     return <p className="text-sm text-rose-600">{data?.error || 'Failed to load schema info'}</p>;
   }
 
+  const summary = `Schema Information\n\nTotal Tables: ${data.totalTables}\n\nTables:\n${(data.tables || []).map(table => {
+    const columnsText = (table.columns || []).map(col => `    - ${col.name} (${col.type})`).join('\n');
+    return `- ${table.tableName}: ${table.description || 'No description'}\n  Columns:\n${columnsText}`;
+  }).join('\n\n')}`;
+
   return (
     <div className="space-y-3">
       <p className="text-xs text-surface-500">{messages.info.schemaInfoDescription}</p>
-      <p className="text-xs font-bold text-surface-600">{data.totalTables} Core Tables</p>
-      {(data.tables || []).map((table, i) => (
-        <div key={i} className="p-3 bg-surface-50 rounded-lg border border-surface-200">
-          <div className="flex items-center gap-2 mb-1">
-            <Table2 size={12} className="text-brand-500" />
-            <span className="text-xs font-bold font-mono text-surface-800">{table.tableName}</span>
-          </div>
-          <p className="text-[10px] text-surface-500 mb-2">{table.description}</p>
-          <div className="grid grid-cols-2 gap-1">
-            {(table.columns || []).map((col, j) => (
-              <div key={j} className="flex items-center gap-1.5 text-[10px]">
-                <span className={`w-1.5 h-1.5 rounded-full ${col.primaryKey ? 'bg-amber-400' : 'bg-surface-300'}`} />
-                <span className="font-mono text-surface-700">{col.name}</span>
-                <span className="text-surface-400">{col.type}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
+      <div className="p-4 bg-surface-50 rounded-lg border border-surface-200 font-mono text-xs text-surface-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
+        {summary}
+      </div>
     </div>
   );
 }

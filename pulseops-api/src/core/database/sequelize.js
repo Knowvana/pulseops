@@ -13,6 +13,7 @@ import logger, { msg, logMessages } from '#core/logger.js';
 
 const require = createRequire(import.meta.url);
 const dbConfig = require('#config/database.json');
+const queries = require('#config/queries.json');
 
 const sequelize = new Sequelize(
   process.env.DB_NAME || dbConfig.database,
@@ -41,10 +42,10 @@ export async function testConnection() {
     let dbVersion = null;
     let dbSystemTime = null;
     try {
-      const [versionResult] = await sequelize.query("SELECT version() as version");
+      const [versionResult] = await sequelize.query(queries.database.getVersion);
       dbVersion = versionResult[0]?.version || null;
       
-      const [timeResult] = await sequelize.query("SELECT NOW() as current_time");
+      const [timeResult] = await sequelize.query(queries.database.getSystemTime);
       dbSystemTime = timeResult[0]?.current_time || null;
     } catch (_) {
       // If queries fail, continue without them
