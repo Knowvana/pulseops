@@ -105,11 +105,19 @@ export default function RosterConfig({
     }
 
     setIsCheckingDuplicate(true);
+    setDuplicateCheckResult(null);
     Logger.debug('RosterConfig', 'Starting duplicate shift name check', { shiftName });
 
     try {
+      const startTime = Date.now();
       const result = await RosterService.checkDuplicateShiftName(shiftName.trim());
       
+      // Ensure progress bar is visible for at least 800ms
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 800) {
+        await new Promise(resolve => setTimeout(resolve, 800 - elapsed));
+      }
+
       if (result.error) {
         Logger.warn('RosterConfig', 'Duplicate check failed', { error: result.error });
         setDuplicateCheckResult({ isDuplicate: false, checked: true, error: true });
@@ -497,14 +505,14 @@ export default function RosterConfig({
               {duplicateCheckResult && duplicateCheckResult.checked && !isCheckingDuplicate && (
                 <div className="mt-3">
                   {duplicateCheckResult.isDuplicate ? (
-                    <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg">
-                      <XCircle size={18} className="text-rose-600 shrink-0" />
-                      <span className="text-sm font-semibold text-rose-700">{messages.errors.shiftNameDuplicate}</span>
+                    <div className="flex items-center gap-2 py-1">
+                      <XCircle size={16} className="text-rose-600 shrink-0" />
+                      <span className="text-xs font-medium text-rose-700">{messages.errors.shiftNameDuplicate}</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                      <CheckCircle size={18} className="text-emerald-600 shrink-0" />
-                      <span className="text-sm font-semibold text-emerald-700">{messages.errors.shiftNameValid}</span>
+                    <div className="flex items-center gap-2 py-1">
+                      <CheckCircle size={16} className="text-emerald-600 shrink-0" />
+                      <span className="text-xs font-medium text-emerald-700">{messages.errors.shiftNameValid}</span>
                     </div>
                   )}
                 </div>
