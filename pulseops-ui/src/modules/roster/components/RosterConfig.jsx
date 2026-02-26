@@ -12,7 +12,7 @@
 // is displayed in a modal dialog using the shared Modal component.
 // ============================================================================
 import React, { useState } from 'react';
-import { Trash2, Plus, CalendarX2, Users } from 'lucide-react';
+import { Trash2, Plus, CalendarX2, Users, Clock, Edit } from 'lucide-react';
 import { Modal, Button, TimePicker } from '@shared';
 import { COLORS } from '@modules/roster/utils/rosterConstants';
 import uiText from '@shared/config/uiElementsText.json';
@@ -213,47 +213,58 @@ export default function RosterConfig({
         isOpen={showShiftModal}
         onClose={() => setShowShiftModal(false)}
         title={rosterTxt.shiftSchedule?.form?.title || 'Add New Shift'}
-        size="lg"
-        className="max-w-2xl"
+        size="xl"
+        className="max-w-4xl"
+        icon={Plus}
       >
         <div className="space-y-5">
-          {/* Shift Label */}
-          <div>
-            <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.shiftLabel || 'Shift Label'}</label>
-            <input
-              type="text"
-              placeholder={rosterTxt.shiftSchedule?.form?.shiftPlaceholder || 'e.g., Morning, Evening'}
-              value={newShift.label}
-              onChange={(e) => setNewShift({ ...newShift, label: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm"
-            />
+          {/* Shift Label and Color Row - 2 Columns */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Shift Label */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-surface-700 mb-2">
+                <Edit size={16} className="text-brand-600" />
+                {rosterTxt.shiftSchedule?.form?.shiftLabel || 'Shift Name'}
+              </label>
+              <input
+                type="text"
+                placeholder={rosterTxt.shiftSchedule?.form?.shiftPlaceholder || 'e.g., Morning, Evening'}
+                value={newShift.label}
+                onChange={(e) => setNewShift({ ...newShift, label: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+              />
+            </div>
+
+            {/* Color Selection */}
+            <div>
+              <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.colorLabel || 'Shift Color'}</label>
+              <div className="flex gap-3 flex-wrap">
+                {COLORS.map(c => (
+                  <button
+                    key={c.label}
+                    onClick={() => setNewShift({ ...newShift, color: c.value })}
+                    className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all shadow-[0_0_8px_rgba(59,130,246,0.2)] ${c.value.split(' ')[0]} ${
+                      newShift.color === c.value ? 'border-surface-800 scale-110 ring-4 ring-surface-200 shadow-[0_0_12px_rgba(59,130,246,0.5)]' : 'border-transparent hover:scale-105'
+                    }`}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Shift Time - Using Beautiful Time Picker */}
           <div>
-            <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.timeLabel || 'Shift Time'}</label>
+            <label className="flex items-center gap-2 text-sm font-semibold text-surface-700 mb-2">
+              <Clock size={16} className="text-brand-600" />
+              {rosterTxt.shiftSchedule?.form?.timeLabel || 'Shift Time'}
+            </label>
             <TimePicker
               value={newShift.time}
               onChange={(time) => setNewShift({ ...newShift, time })}
               label={rosterTxt.shiftSchedule?.form?.timePlaceholder || 'e.g., 09:00 - 17:00'}
+              className="shadow-[0_0_10px_rgba(59,130,246,0.3)]"
             />
-          </div>
-
-          {/* Color Selection */}
-          <div>
-            <label className="block text-sm font-semibold text-surface-700 mb-3">{rosterTxt.shiftSchedule?.form?.colorLabel || 'Shift Color'}</label>
-            <div className="flex gap-3 flex-wrap">
-              {COLORS.map(c => (
-                <button
-                  key={c.label}
-                  onClick={() => setNewShift({ ...newShift, color: c.value })}
-                  className={`w-10 h-10 rounded-full border-2 shadow-sm transition-all ${c.value.split(' ')[0]} ${
-                    newShift.color === c.value ? 'border-surface-800 scale-110 ring-4 ring-surface-200' : 'border-transparent hover:scale-105'
-                  }`}
-                  title={c.label}
-                />
-              ))}
-            </div>
           </div>
 
           {/* Gradient Separator */}
@@ -263,38 +274,47 @@ export default function RosterConfig({
             <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-300 to-transparent"></div>
           </div>
 
-          {/* Weekday Requirement */}
-          <div>
-            <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.weekdayLabel || 'Minimum Resources in Shift for Weekdays'}</label>
-            <input
-              type="number"
-              min="0"
-              placeholder="0"
-              value={newShift.reqWeekday || ''}
-              onChange={(e) => setNewShift({ ...newShift, reqWeekday: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm"
-            />
-          </div>
+          {/* Minimum Resources Row - 2 Columns */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Weekday Requirement */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-surface-700 mb-2">
+                <Users size={16} className="text-brand-600" />
+                {rosterTxt.shiftSchedule?.form?.weekdayLabel || 'Minimum Resources in Shift for Weekdays'}
+              </label>
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={newShift.reqWeekday || ''}
+                onChange={(e) => setNewShift({ ...newShift, reqWeekday: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+              />
+            </div>
 
-          {/* Weekend Requirement */}
-          <div>
-            <label className="block text-sm font-semibold text-surface-700 mb-2">{rosterTxt.shiftSchedule?.form?.weekendLabel || 'Minimum Resources in Shift for Weekends'}</label>
-            <input
-              type="number"
-              min="0"
-              placeholder="0"
-              value={newShift.reqWeekend || ''}
-              onChange={(e) => setNewShift({ ...newShift, reqWeekend: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm"
-            />
+            {/* Weekend Requirement */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-surface-700 mb-2">
+                <Users size={16} className="text-brand-600" />
+                {rosterTxt.shiftSchedule?.form?.weekendLabel || 'Minimum Resources in Shift for Weekends'}
+              </label>
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={newShift.reqWeekend || ''}
+                onChange={(e) => setNewShift({ ...newShift, reqWeekend: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+              />
+            </div>
           </div>
 
           {/* Form Actions */}
-          <div className="flex gap-3 pt-4 border-t border-surface-100">
+          <div className="flex gap-3 pt-4 border-t border-surface-100 justify-end">
             <Button
               variant="secondary"
               onClick={() => setShowShiftModal(false)}
-              className="flex-1"
+              className="px-3 py-1 w-32"
             >
               {rosterTxt.shiftSchedule?.form?.cancelButton || 'Cancel'}
             </Button>
@@ -302,7 +322,7 @@ export default function RosterConfig({
               variant="primary"
               onClick={addShift}
               disabled={!newShift.label || !newShift.time}
-              className="flex-1"
+              className="px-3 py-1 w-32"
             >
               {rosterTxt.shiftSchedule?.form?.submitButton || 'Create Shift'}
             </Button>

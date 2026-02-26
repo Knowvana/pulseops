@@ -445,7 +445,7 @@
         },
         "form": {
           "title": "Add New Shift",
-          "shiftLabel": "Shift Label",
+          "shiftLabel": "Shift Name",
           "shiftPlaceholder": "e.g., Morning, Evening",
           "timeLabel": "Shift Time",
           "timePlaceholder": "e.g., 09:00 - 17:00",

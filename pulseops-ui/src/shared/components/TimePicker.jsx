@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
+import { Modal } from '@shared';
 
 export default function TimePicker({ value = '', onChange = () => {}, label = 'Select Time' }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,6 +27,11 @@ export default function TimePicker({ value = '', onChange = () => {}, label = 'S
 
   const formatTime = (h, m) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
+  const updateValue = (sh, sm, eh, em) => {
+    const timeString = `${formatTime(sh, sm)} - ${formatTime(eh, em)}`;
+    onChange(timeString);
+  };
+
   const handleConfirm = () => {
     const timeString = `${formatTime(startHour, startMin)} - ${formatTime(endHour, endMin)}`;
     onChange(timeString);
@@ -34,33 +40,49 @@ export default function TimePicker({ value = '', onChange = () => {}, label = 'S
 
   const incrementHour = (type) => {
     if (type === 'start') {
-      setStartHour(prev => (prev + 1) % 24);
+      const newHour = (startHour + 1) % 24;
+      setStartHour(newHour);
+      updateValue(newHour, startMin, endHour, endMin);
     } else {
-      setEndHour(prev => (prev + 1) % 24);
+      const newHour = (endHour + 1) % 24;
+      setEndHour(newHour);
+      updateValue(startHour, startMin, newHour, endMin);
     }
   };
 
   const decrementHour = (type) => {
     if (type === 'start') {
-      setStartHour(prev => (prev - 1 + 24) % 24);
+      const newHour = (startHour - 1 + 24) % 24;
+      setStartHour(newHour);
+      updateValue(newHour, startMin, endHour, endMin);
     } else {
-      setEndHour(prev => (prev - 1 + 24) % 24);
+      const newHour = (endHour - 1 + 24) % 24;
+      setEndHour(newHour);
+      updateValue(startHour, startMin, newHour, endMin);
     }
   };
 
   const incrementMin = (type) => {
     if (type === 'start') {
-      setStartMin(prev => (prev + 15) % 60);
+      const newMin = (startMin + 15) % 60;
+      setStartMin(newMin);
+      updateValue(startHour, newMin, endHour, endMin);
     } else {
-      setEndMin(prev => (prev + 15) % 60);
+      const newMin = (endMin + 15) % 60;
+      setEndMin(newMin);
+      updateValue(startHour, startMin, endHour, newMin);
     }
   };
 
   const decrementMin = (type) => {
     if (type === 'start') {
-      setStartMin(prev => (prev - 15 + 60) % 60);
+      const newMin = (startMin - 15 + 60) % 60;
+      setStartMin(newMin);
+      updateValue(startHour, newMin, endHour, endMin);
     } else {
-      setEndMin(prev => (prev - 15 + 60) % 60);
+      const newMin = (endMin - 15 + 60) % 60;
+      setEndMin(newMin);
+      updateValue(startHour, startMin, endHour, newMin);
     }
   };
 
@@ -68,7 +90,7 @@ export default function TimePicker({ value = '', onChange = () => {}, label = 'S
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm text-left bg-white hover:bg-surface-50 transition-colors flex items-center justify-between"
+        className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm text-left bg-white hover:bg-surface-50 transition-colors flex items-center justify-between shadow-[0_0_10px_rgba(59,130,246,0.3)]"
       >
         <span className={value ? 'text-surface-800' : 'text-surface-400'}>
           {value || label}
@@ -77,126 +99,109 @@ export default function TimePicker({ value = '', onChange = () => {}, label = 'S
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-surface-200 rounded-xl shadow-lg p-6 z-50">
+        <Modal
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          title="Select Time"
+        >
           <div className="space-y-4">
-            {/* Start Time */}
-            <div>
-              <label className="block text-xs font-bold text-surface-500 uppercase tracking-widest mb-3">Start Time</label>
-              <div className="flex gap-4 items-center justify-center">
-                {/* Hours */}
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    onClick={() => incrementHour('start')}
-                    className="p-2 hover:bg-brand-50 rounded-lg transition-colors text-brand-600"
-                  >
-                    <ChevronUp size={20} />
-                  </button>
-                  <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-brand-50 to-teal-50 rounded-xl border-2 border-brand-200 font-bold text-2xl text-brand-700">
-                    {String(startHour).padStart(2, '0')}
+            <div className="flex items-center justify-center gap-4">
+              {/* Start Time */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-sm font-bold text-surface-500 uppercase tracking-widest">Start</div>
+                <div className="flex gap-2 items-center">
+                  {/* Hours */}
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      onClick={() => incrementHour('start')}
+                      className="p-2 hover:bg-brand-50 rounded-lg transition-colors text-brand-600"
+                    >
+                      <ChevronUp size={20} />
+                    </button>
+                    <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-brand-50 to-teal-50 rounded-xl border-2 border-brand-200 font-bold text-lg text-brand-700">
+                      {String(startHour).padStart(2, '0')}
+                    </div>
+                    <button
+                      onClick={() => decrementHour('start')}
+                      className="p-2 hover:bg-brand-50 rounded-lg transition-colors text-brand-600"
+                    >
+                      <ChevronDown size={20} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => decrementHour('start')}
-                    className="p-2 hover:bg-brand-50 rounded-lg transition-colors text-brand-600"
-                  >
-                    <ChevronDown size={20} />
-                  </button>
-                </div>
-
-                {/* Separator */}
-                <div className="text-2xl font-bold text-surface-400">:</div>
-
-                {/* Minutes */}
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    onClick={() => incrementMin('start')}
-                    className="p-2 hover:bg-brand-50 rounded-lg transition-colors text-brand-600"
-                  >
-                    <ChevronUp size={20} />
-                  </button>
-                  <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-brand-50 to-teal-50 rounded-xl border-2 border-brand-200 font-bold text-2xl text-brand-700">
-                    {String(startMin).padStart(2, '0')}
+                  <div className="text-2xl font-bold text-surface-400">:</div>
+                  {/* Minutes */}
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      onClick={() => incrementMin('start')}
+                      className="p-2 hover:bg-brand-50 rounded-lg transition-colors text-brand-600"
+                    >
+                      <ChevronUp size={20} />
+                    </button>
+                    <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-brand-50 to-teal-50 rounded-xl border-2 border-brand-200 font-bold text-lg text-brand-700">
+                      {String(startMin).padStart(2, '0')}
+                    </div>
+                    <button
+                      onClick={() => decrementMin('start')}
+                      className="p-2 hover:bg-brand-50 rounded-lg transition-colors text-brand-600"
+                    >
+                      <ChevronDown size={20} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => decrementMin('start')}
-                    className="p-2 hover:bg-brand-50 rounded-lg transition-colors text-brand-600"
-                  >
-                    <ChevronDown size={20} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Separator */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-300 to-transparent"></div>
-              <span className="text-sm font-bold text-surface-400">to</span>
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-surface-300 to-transparent"></div>
-            </div>
-
-            {/* End Time */}
-            <div>
-              <label className="block text-xs font-bold text-surface-500 uppercase tracking-widest mb-3">End Time</label>
-              <div className="flex gap-4 items-center justify-center">
-                {/* Hours */}
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    onClick={() => incrementHour('end')}
-                    className="p-2 hover:bg-amber-50 rounded-lg transition-colors text-amber-600"
-                  >
-                    <ChevronUp size={20} />
-                  </button>
-                  <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 font-bold text-2xl text-amber-700">
-                    {String(endHour).padStart(2, '0')}
-                  </div>
-                  <button
-                    onClick={() => decrementHour('end')}
-                    className="p-2 hover:bg-amber-50 rounded-lg transition-colors text-amber-600"
-                  >
-                    <ChevronDown size={20} />
-                  </button>
-                </div>
-
-                {/* Separator */}
-                <div className="text-2xl font-bold text-surface-400">:</div>
-
-                {/* Minutes */}
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    onClick={() => incrementMin('end')}
-                    className="p-2 hover:bg-amber-50 rounded-lg transition-colors text-amber-600"
-                  >
-                    <ChevronUp size={20} />
-                  </button>
-                  <div className="w-16 h-16 flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 font-bold text-2xl text-amber-700">
-                    {String(endMin).padStart(2, '0')}
-                  </div>
-                  <button
-                    onClick={() => decrementMin('end')}
-                    className="p-2 hover:bg-amber-50 rounded-lg transition-colors text-amber-600"
-                  >
-                    <ChevronDown size={20} />
-                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* Confirm Button */}
-            <div className="flex gap-3 pt-4 border-t border-surface-100">
-              <button
-                onClick={() => setIsOpen(false)}
-                className="flex-1 px-4 py-2 rounded-lg border border-surface-200 text-surface-700 font-semibold hover:bg-surface-50 transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirm}
-                className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-brand-600 to-teal-600 text-white font-semibold hover:shadow-lg transition-all text-sm"
-              >
-                Confirm
-              </button>
+              {/* Separator */}
+              <div className="flex flex-col items-center">
+                <div className="text-sm font-bold text-surface-500 uppercase tracking-widest">To</div>
+                <div className="text-2xl font-bold text-surface-400">-</div>
+              </div>
+
+              {/* End Time */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-sm font-bold text-surface-500 uppercase tracking-widest">End</div>
+                <div className="flex gap-2 items-center">
+                  {/* Hours */}
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      onClick={() => incrementHour('end')}
+                      className="p-2 hover:bg-amber-50 rounded-lg transition-colors text-amber-600"
+                    >
+                      <ChevronUp size={20} />
+                    </button>
+                    <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 font-bold text-lg text-amber-700">
+                      {String(endHour).padStart(2, '0')}
+                    </div>
+                    <button
+                      onClick={() => decrementHour('end')}
+                      className="p-2 hover:bg-amber-50 rounded-lg transition-colors text-amber-600"
+                    >
+                      <ChevronDown size={20} />
+                    </button>
+                  </div>
+                  <div className="text-2xl font-bold text-surface-400">:</div>
+                  {/* Minutes */}
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      onClick={() => incrementMin('end')}
+                      className="p-2 hover:bg-amber-50 rounded-lg transition-colors text-amber-600"
+                    >
+                      <ChevronUp size={20} />
+                    </button>
+                    <div className="w-8 h-8 flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 font-bold text-lg text-amber-700">
+                      {String(endMin).padStart(2, '0')}
+                    </div>
+                    <button
+                      onClick={() => decrementMin('end')}
+                      className="p-2 hover:bg-amber-50 rounded-lg transition-colors text-amber-600"
+                    >
+                      <ChevronDown size={20} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
