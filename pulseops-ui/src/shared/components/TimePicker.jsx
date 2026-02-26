@@ -4,9 +4,9 @@ import { Modal } from '@shared';
 
 export default function TimePicker({ value = '', onChange = () => {}, label = 'Select Time' }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [startHour, setStartHour] = useState(9);
+  const [startHour, setStartHour] = useState(0);
   const [startMin, setStartMin] = useState(0);
-  const [endHour, setEndHour] = useState(17);
+  const [endHour, setEndHour] = useState(0);
   const [endMin, setEndMin] = useState(0);
 
   // Parse existing value if provided
@@ -102,7 +102,7 @@ export default function TimePicker({ value = '', onChange = () => {}, label = 'S
         <Modal
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
-          title="Select Time"
+          title="Select Shift Time"
         >
           <div className="space-y-4">
             <div className="flex items-center justify-center gap-4">

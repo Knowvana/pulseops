@@ -15,7 +15,18 @@
     "authSwitchFailed": "Failed to switch authentication method.",
     "schemaInitFailed": "Schema initialization failed.",
     "dbWipeFailed": "Database wipe failed. Check server logs.",
-    "dbNotSetup": "Database is not configured or cannot be connected. Please setup the database in the Database Configuration section first."
+    "dbNotSetup": "Database is not configured or cannot be connected. Please setup the database in the Database Configuration section first.",
+    "shiftNameRequired": "Shift name is required. Please enter a shift name.",
+    "shiftNameMinLength": "Shift name must be at least 2 characters long.",
+    "shiftNameMaxLength": "Shift name cannot exceed 50 characters.",
+    "shiftTimeRequired": "Shift time is required. Please select a shift time.",
+    "shiftTimeInvalid": "Invalid shift time format. Please use HH:MM - HH:MM format.",
+    "weekdayResourcesRequired": "Weekday resources is required. Please enter a value.",
+    "weekdayResourcesInvalid": "Weekday resources must be a positive number.",
+    "weekdayResourcesMax": "Weekday resources cannot exceed 999.",
+    "weekendResourcesRequired": "Weekend resources is required. Please enter a value.",
+    "weekendResourcesInvalid": "Weekend resources must be a positive number.",
+    "weekendResourcesMax": "Weekend resources cannot exceed 999."
   },
   "success": {
     "loginSuccess": "Signed in successfully.",

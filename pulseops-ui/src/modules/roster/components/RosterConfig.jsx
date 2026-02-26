@@ -12,10 +12,12 @@
 // is displayed in a modal dialog using the shared Modal component.
 // ============================================================================
 import React, { useState } from 'react';
-import { Trash2, Plus, CalendarX2, Users, Clock, Edit } from 'lucide-react';
-import { Modal, Button, TimePicker } from '@shared';
+import { Trash2, Plus, CalendarX2, Users, Clock, Edit, AlertCircle } from 'lucide-react';
+import { Modal, Button, TimePicker, ProgressBar, StatusTile, Logger } from '@shared';
 import { COLORS } from '@modules/roster/utils/rosterConstants';
+import RosterService from '@modules/roster/services/rosterService';
 import uiText from '@shared/config/uiElementsText.json';
+import messages from '@shared/config/messages.json';
 
 const rosterTxt = uiText.shiftRoster?.config || {};
 
@@ -41,12 +43,150 @@ export default function RosterConfig({
   const [newLeave, setNewLeave] = useState({ empId: '', date: '' });
   const [newEmployeeName, setNewEmployeeName] = useState('');
 
-  const addShift = () => {
-    if (!newShift.label || !newShift.time) return;
-    const id = newShift.label.toLowerCase().replace(/\s+/g, '-');
-    setShifts([...shifts, { ...newShift, id, reqWeekday: Number(newShift.reqWeekday), reqWeekend: Number(newShift.reqWeekend) }]);
-    setNewShift({ label: '', time: '', color: COLORS[0].value, reqWeekday: 0, reqWeekend: 0 });
-    setShowShiftModal(false);
+  // Save shift state management
+  const [isSavingShift, setIsSavingShift] = useState(false);
+  const [shiftSaveStatus, setShiftSaveStatus] = useState(null); // { success, message, shiftId }
+
+  // Form validation state
+  const [formErrors, setFormErrors] = useState({}); // { fieldName: errorMessage }
+
+  // Validation function for shift form
+  const validateShiftForm = () => {
+    const errors = {};
+
+    // Validate shift name
+    if (!newShift.label || !newShift.label.trim()) {
+      errors.label = messages.errors.shiftNameRequired;
+    } else if (newShift.label.trim().length < 2) {
+      errors.label = messages.errors.shiftNameMinLength;
+    } else if (newShift.label.trim().length > 50) {
+      errors.label = messages.errors.shiftNameMaxLength;
+    }
+
+    // Validate shift time
+    if (!newShift.time || !newShift.time.trim()) {
+      errors.time = messages.errors.shiftTimeRequired;
+    } else if (!/^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/.test(newShift.time.trim())) {
+      errors.time = messages.errors.shiftTimeInvalid;
+    }
+
+    // Validate weekday resources
+    if (newShift.reqWeekday === '' || newShift.reqWeekday === null) {
+      errors.reqWeekday = messages.errors.weekdayResourcesRequired;
+    } else if (isNaN(newShift.reqWeekday) || Number(newShift.reqWeekday) < 0) {
+      errors.reqWeekday = messages.errors.weekdayResourcesInvalid;
+    } else if (Number(newShift.reqWeekday) > 999) {
+      errors.reqWeekday = messages.errors.weekdayResourcesMax;
+    }
+
+    // Validate weekend resources
+    if (newShift.reqWeekend === '' || newShift.reqWeekend === null) {
+      errors.reqWeekend = messages.errors.weekendResourcesRequired;
+    } else if (isNaN(newShift.reqWeekend) || Number(newShift.reqWeekend) < 0) {
+      errors.reqWeekend = messages.errors.weekendResourcesInvalid;
+    } else if (Number(newShift.reqWeekend) > 999) {
+      errors.reqWeekend = messages.errors.weekendResourcesMax;
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Check if form is valid (for button enable/disable)
+  const isFormValid = () => {
+    return (
+      newShift.label &&
+      newShift.label.trim().length >= 2 &&
+      newShift.label.trim().length <= 50 &&
+      newShift.time &&
+      /^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/.test(newShift.time.trim()) &&
+      newShift.reqWeekday !== '' &&
+      newShift.reqWeekday !== null &&
+      !isNaN(newShift.reqWeekday) &&
+      Number(newShift.reqWeekday) >= 0 &&
+      Number(newShift.reqWeekday) <= 999 &&
+      newShift.reqWeekend !== '' &&
+      newShift.reqWeekend !== null &&
+      !isNaN(newShift.reqWeekend) &&
+      Number(newShift.reqWeekend) >= 0 &&
+      Number(newShift.reqWeekend) <= 999
+    );
+  };
+
+  const addShift = async () => {
+    // Validate form before submission
+    if (!validateShiftForm()) {
+      Logger.warn('RosterConfig', 'Shift form validation failed', {
+        errors: formErrors,
+      });
+      return;
+    }
+
+    setIsSavingShift(true);
+    setShiftSaveStatus(null);
+
+    Logger.info('RosterConfig', 'Starting shift creation process', {
+      label: newShift.label,
+      time: newShift.time,
+      color: newShift.color,
+    });
+
+    try {
+      const shiftData = {
+        label: newShift.label,
+        time: newShift.time,
+        color: newShift.color,
+        reqWeekday: Number(newShift.reqWeekday),
+        reqWeekend: Number(newShift.reqWeekend),
+      };
+
+      Logger.debug('RosterConfig', 'Calling RosterService.createShift', { shiftData });
+
+      const result = await RosterService.createShift(shiftData);
+
+      if (result.success) {
+        Logger.info('RosterConfig', 'Shift created successfully', {
+          shiftId: result.data?.id,
+          label: newShift.label,
+        });
+
+        // Add shift to local state
+        const id = newShift.label.toLowerCase().replace(/\s+/g, '-');
+        setShifts([...shifts, { ...newShift, id, reqWeekday: Number(newShift.reqWeekday), reqWeekend: Number(newShift.reqWeekend) }]);
+
+        // Show success status
+        setShiftSaveStatus({
+          success: true,
+          message: `Shift "${newShift.label}" created successfully!`,
+          shiftId: result.data?.id,
+        });
+
+        // Reset form
+        setNewShift({ label: '', time: '', color: COLORS[0].value, reqWeekday: 0, reqWeekend: 0 });
+      } else {
+        Logger.error('RosterConfig', 'Shift creation failed', {
+          error: result.error?.message,
+          code: result.error?.code,
+        });
+
+        setShiftSaveStatus({
+          success: false,
+          message: result.error?.message || 'Failed to create shift. Please try again.',
+        });
+      }
+    } catch (err) {
+      Logger.error('RosterConfig', 'Unexpected error during shift creation', {
+        error: err.message,
+        stack: err.stack,
+      });
+
+      setShiftSaveStatus({
+        success: false,
+        message: `Error: ${err.message}`,
+      });
+    } finally {
+      setIsSavingShift(false);
+    }
   };
 
   const removeShift = (id) => { if (shifts.length > 1) setShifts(shifts.filter(s => s.id !== id)); };
@@ -217,6 +357,13 @@ export default function RosterConfig({
         className="max-w-4xl"
         icon={Plus}
       >
+        {/* Progress Bar - Show during save */}
+        {isSavingShift && (
+          <div className="mb-6">
+            <ProgressBar progress={50} label="Creating shift..." />
+          </div>
+        )}
+
         <div className="space-y-5">
           {/* Shift Label and Color Row - 2 Columns */}
           <div className="grid grid-cols-2 gap-4">
@@ -230,9 +377,22 @@ export default function RosterConfig({
                 type="text"
                 placeholder={rosterTxt.shiftSchedule?.form?.shiftPlaceholder || 'e.g., Morning, Evening'}
                 value={newShift.label}
-                onChange={(e) => setNewShift({ ...newShift, label: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                onChange={(e) => {
+                  setNewShift({ ...newShift, label: e.target.value });
+                  if (formErrors.label) setFormErrors({ ...formErrors, label: null });
+                }}
+                className={`w-full px-4 py-3 rounded-xl border font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)] focus:outline-none focus:ring-2 ${
+                  formErrors.label
+                    ? 'border-rose-300 focus:ring-rose-500'
+                    : 'border-surface-200 focus:ring-brand-500'
+                }`}
               />
+              {formErrors.label && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-rose-600">
+                  <AlertCircle size={14} />
+                  <span>{formErrors.label}</span>
+                </div>
+              )}
             </div>
 
             {/* Color Selection */}
@@ -261,10 +421,19 @@ export default function RosterConfig({
             </label>
             <TimePicker
               value={newShift.time}
-              onChange={(time) => setNewShift({ ...newShift, time })}
+              onChange={(time) => {
+                setNewShift({ ...newShift, time });
+                if (formErrors.time) setFormErrors({ ...formErrors, time: null });
+              }}
               label={rosterTxt.shiftSchedule?.form?.timePlaceholder || 'e.g., 09:00 - 17:00'}
               className="shadow-[0_0_10px_rgba(59,130,246,0.3)]"
             />
+            {formErrors.time && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-rose-600">
+                <AlertCircle size={14} />
+                <span>{formErrors.time}</span>
+              </div>
+            )}
           </div>
 
           {/* Gradient Separator */}
@@ -285,11 +454,25 @@ export default function RosterConfig({
               <input
                 type="number"
                 min="0"
+                max="999"
                 placeholder="0"
                 value={newShift.reqWeekday || ''}
-                onChange={(e) => setNewShift({ ...newShift, reqWeekday: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                onChange={(e) => {
+                  setNewShift({ ...newShift, reqWeekday: e.target.value });
+                  if (formErrors.reqWeekday) setFormErrors({ ...formErrors, reqWeekday: null });
+                }}
+                className={`w-full px-4 py-3 rounded-xl border font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)] focus:outline-none focus:ring-2 ${
+                  formErrors.reqWeekday
+                    ? 'border-rose-300 focus:ring-rose-500'
+                    : 'border-surface-200 focus:ring-brand-500'
+                }`}
               />
+              {formErrors.reqWeekday && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-rose-600">
+                  <AlertCircle size={14} />
+                  <span>{formErrors.reqWeekday}</span>
+                </div>
+              )}
             </div>
 
             {/* Weekend Requirement */}
@@ -301,11 +484,25 @@ export default function RosterConfig({
               <input
                 type="number"
                 min="0"
+                max="999"
                 placeholder="0"
                 value={newShift.reqWeekend || ''}
-                onChange={(e) => setNewShift({ ...newShift, reqWeekend: e.target.value })}
-                className="w-full px-4 py-3 rounded-xl border border-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500 font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                onChange={(e) => {
+                  setNewShift({ ...newShift, reqWeekend: e.target.value });
+                  if (formErrors.reqWeekend) setFormErrors({ ...formErrors, reqWeekend: null });
+                }}
+                className={`w-full px-4 py-3 rounded-xl border font-medium text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)] focus:outline-none focus:ring-2 ${
+                  formErrors.reqWeekend
+                    ? 'border-rose-300 focus:ring-rose-500'
+                    : 'border-surface-200 focus:ring-brand-500'
+                }`}
               />
+              {formErrors.reqWeekend && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-rose-600">
+                  <AlertCircle size={14} />
+                  <span>{formErrors.reqWeekend}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -313,21 +510,38 @@ export default function RosterConfig({
           <div className="flex gap-3 pt-4 border-t border-surface-100 justify-end">
             <Button
               variant="secondary"
-              onClick={() => setShowShiftModal(false)}
+              onClick={() => {
+                Logger.debug('RosterConfig', 'User cancelled shift creation');
+                setShowShiftModal(false);
+                setFormErrors({});
+              }}
               className="px-3 py-1 w-32"
+              disabled={isSavingShift}
             >
               {rosterTxt.shiftSchedule?.form?.cancelButton || 'Cancel'}
             </Button>
             <Button
               variant="primary"
               onClick={addShift}
-              disabled={!newShift.label || !newShift.time}
+              disabled={!isFormValid() || isSavingShift}
               className="px-3 py-1 w-32"
             >
-              {rosterTxt.shiftSchedule?.form?.submitButton || 'Create Shift'}
+              {isSavingShift ? 'Creating...' : (rosterTxt.shiftSchedule?.form?.submitButton || 'Create Shift')}
             </Button>
           </div>
         </div>
+
+        {/* Status Tile - Show after save attempt */}
+        {shiftSaveStatus && (
+          <div className="mt-6">
+            <StatusTile
+              status={shiftSaveStatus.success ? 'success' : 'error'}
+              title={shiftSaveStatus.success ? 'Success' : 'Error'}
+              message={shiftSaveStatus.message}
+              onClose={() => setShiftSaveStatus(null)}
+            />
+          </div>
+        )}
       </Modal>
       )}
     </div>
