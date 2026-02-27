@@ -50,7 +50,7 @@ export default function RosterProvider({ children }) {
   const [shiftTimeLeft, setShiftTimeLeft] = useState('');
 
   // --- Navigation & View ---
-  const [viewMode, setViewMode] = useState('month');
+  const [viewMode, setViewMode] = useState('week');
   const [currentDate, setCurrentDate] = useState(new Date());
 
   // --- Confirmation Modal ---

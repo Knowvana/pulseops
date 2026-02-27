@@ -14,7 +14,7 @@ import React, { useState } from 'react';
 import {
   List, CalendarDays, Grid, ChevronLeft, ChevronRight,
   RefreshCw, Download, Users, AlertCircle, Edit2, X, Save, CheckCircle2,
-  Clock, Calendar, Timer, UserCheck, Loader2
+  Clock, Calendar, Timer, UserCheck, Loader2, LayoutGrid, Table2
 } from 'lucide-react';
 import { EmptyState } from '@shared';
 import messages from '@shared/config/messages.json';
@@ -99,6 +99,7 @@ export default function RosterDashboard({ onNavigateToConfig }) {
   } = useRoster();
 
   const [editingShift, setEditingShift] = useState(null);
+  const [layoutMode, setLayoutMode] = useState('grid');
 
   const openEditModal = (dateKey, shiftId, currentWorkers) => {
     setEditingShift({ dateKey, shiftId, currentWorkers });
@@ -330,6 +331,286 @@ export default function RosterDashboard({ onNavigateToConfig }) {
     );
   };
 
+  const getShiftColor = (shiftId) => {
+    const shift = shifts.find(s => s.id === shiftId);
+    return shift?.color || 'bg-surface-100 text-surface-600';
+  };
+
+  const getShiftLabel = (shiftId) => {
+    const shift = shifts.find(s => s.id === shiftId);
+    return shift?.label || 'Unknown';
+  };
+
+  const getShiftTime = (shiftId) => {
+    const shift = shifts.find(s => s.id === shiftId);
+    return shift?.time || '—';
+  };
+
+  const renderDailyGridView = () => {
+    const dateKey = getSafeDateKey(currentDate);
+    const daySchedule = schedule?.[dateKey] || {};
+    const EMPLOYEE_COL_WIDTH = 'w-48';
+    const DAY_COL_WIDTH = 'w-44';
+    const ROW_HEIGHT = 'h-24';
+
+    return (
+      <div className="bg-white border border-surface-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full">
+        {/* Header Row */}
+        <div className="flex shrink-0 border-b-2 border-surface-300">
+          <div className={`${EMPLOYEE_COL_WIDTH} flex-shrink-0 bg-gradient-to-br from-brand-500 via-brand-600 to-teal-700 border-r-2 border-surface-300 p-4 flex items-end justify-start`}>
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">EMPLOYEE / ROLE</p>
+          </div>
+          <div className={`${DAY_COL_WIDTH} flex-shrink-0 py-4 px-3 text-center bg-gradient-to-br from-emerald-400 via-teal-500 to-emerald-600`}>
+            <p className="text-[10px] font-bold text-white/80 uppercase tracking-widest mb-1">{WEEKDAYS[currentDate.getDay()]}</p>
+            <p className="text-2xl font-extrabold text-white">{currentDate.getDate()}</p>
+            <p className="text-[10px] text-white/70 font-semibold mt-0.5">{currentDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-hidden flex min-h-0">
+          <div className={`${EMPLOYEE_COL_WIDTH} flex-shrink-0 overflow-y-auto custom-scrollbar border-r-2 border-surface-300 bg-gradient-to-b from-surface-100 to-surface-50`}>
+            <div className="divide-y-2 divide-surface-300">
+              {employees.map(emp => (
+                <div key={emp.id} className={`${ROW_HEIGHT} p-4 bg-white hover:bg-surface-50/80 transition-colors flex items-center border-b border-surface-200`}>
+                  <div className="flex items-start gap-3 w-full">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center flex-shrink-0 font-bold text-sm shadow-md">
+                      {emp.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-surface-800 truncate">{emp.name}</p>
+                      <p className="text-[10px] text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
+                      {emp.hoursWorked && <p className="text-[10px] font-semibold text-teal-600 mt-1">{emp.hoursWorked}h</p>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto custom-scrollbar">
+            <div className="inline-flex">
+              <div className={`flex-shrink-0 ${DAY_COL_WIDTH} divide-y-2 divide-surface-300 bg-emerald-50/10`}>
+                {employees.map(emp => (
+                  <div key={emp.id} className={`${ROW_HEIGHT} p-3 hover:bg-surface-50/50 transition-colors flex items-center justify-center border-b border-surface-200`}>
+                    <div className="w-full space-y-1.5 flex flex-col items-center justify-center">
+                      {shifts.map(shift => {
+                        const workers = daySchedule[shift.id] || [];
+                        const isAssigned = workers.includes(emp.id);
+                        if (!isAssigned) return null;
+                        return (
+                          <div key={shift.id} onClick={() => openEditModal(dateKey, shift.id, workers)} className={`group cursor-pointer rounded-lg p-2 text-center transition-all hover:shadow-md hover:scale-105 relative overflow-hidden border-2 w-full ${getShiftColor(shift.id)} bg-opacity-30 border-opacity-50`}>
+                            <p className="text-[9px] font-extrabold uppercase tracking-wider leading-tight">{getShiftLabel(shift.id)}</p>
+                            <p className="text-[8px] font-semibold mt-0.5 opacity-75">{getShiftTime(shift.id)}</p>
+                            <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 text-brand-600 transition-opacity"><Edit2 size={10} /></div>
+                          </div>
+                        );
+                      })}
+                      {shifts.filter(s => (daySchedule[s.id] || []).includes(emp.id)).length === 0 && (
+                        <div className="rounded-lg p-2 text-center bg-surface-200/40 border-2 border-surface-300/40 w-full">
+                          <p className="text-[9px] font-semibold text-surface-500">OFF</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderWeeklyGridView = () => {
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
+      weekDays.push(d);
+    }
+
+    const EMPLOYEE_COL_WIDTH = 'w-48';
+    const DAY_COL_WIDTH = 'w-44';
+    const ROW_HEIGHT = 'h-24';
+
+    return (
+      <div className="bg-white border border-surface-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full">
+        <div className="flex shrink-0 border-b-2 border-surface-300">
+          <div className={`${EMPLOYEE_COL_WIDTH} flex-shrink-0 bg-gradient-to-br from-brand-500 via-brand-600 to-teal-700 border-r-2 border-surface-300 p-4 flex items-end justify-start`}>
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">EMPLOYEE / ROLE</p>
+          </div>
+          <div className="flex-1 overflow-x-auto custom-scrollbar">
+            <div className="flex">
+              {weekDays.map((day, idx) => {
+                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                return (
+                  <div key={idx} className={`${DAY_COL_WIDTH} flex-shrink-0 py-4 px-3 text-center border-r-2 border-surface-300 last:border-r-0 ${isWeekend ? 'bg-gradient-to-br from-indigo-400 via-purple-500 to-indigo-600' : 'bg-gradient-to-br from-emerald-400 via-teal-500 to-emerald-600'}`}>
+                    <p className="text-[10px] font-bold text-white/80 uppercase tracking-widest mb-1">{WEEKDAYS[day.getDay()]}</p>
+                    <p className="text-2xl font-extrabold text-white">{day.getDate()}</p>
+                    <p className="text-[10px] text-white/70 font-semibold mt-0.5">{day.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-hidden flex min-h-0">
+          <div className={`${EMPLOYEE_COL_WIDTH} flex-shrink-0 overflow-y-auto custom-scrollbar border-r-2 border-surface-300 bg-gradient-to-b from-surface-100 to-surface-50`}>
+            <div className="divide-y-2 divide-surface-300">
+              {employees.map(emp => (
+                <div key={emp.id} className={`${ROW_HEIGHT} p-4 bg-white hover:bg-surface-50/80 transition-colors flex items-center border-b border-surface-200`}>
+                  <div className="flex items-start gap-3 w-full">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center flex-shrink-0 font-bold text-sm shadow-md">
+                      {emp.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-surface-800 truncate">{emp.name}</p>
+                      <p className="text-[10px] text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
+                      {emp.hoursWorked && <p className="text-[10px] font-semibold text-teal-600 mt-1">{emp.hoursWorked}h</p>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto custom-scrollbar">
+            <div className="inline-flex">
+              {weekDays.map((day, dayIdx) => {
+                const dateKey = getSafeDateKey(day);
+                const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                const daySchedule = schedule?.[dateKey] || {};
+                return (
+                  <div key={dayIdx} className={`flex-shrink-0 ${DAY_COL_WIDTH} border-r-2 border-surface-300 last:border-r-0 divide-y-2 divide-surface-300 ${isWeekend ? 'bg-indigo-50/10' : 'bg-emerald-50/10'}`}>
+                    {employees.map(emp => (
+                      <div key={emp.id} className={`${ROW_HEIGHT} p-3 hover:bg-surface-50/50 transition-colors flex items-center justify-center border-b border-surface-200`}>
+                        <div className="w-full space-y-1.5 flex flex-col items-center justify-center">
+                          {shifts.map(shift => {
+                            const workers = daySchedule[shift.id] || [];
+                            const isAssigned = workers.includes(emp.id);
+                            if (!isAssigned) return null;
+                            return (
+                              <div key={shift.id} onClick={() => openEditModal(dateKey, shift.id, workers)} className={`group cursor-pointer rounded-lg p-2 text-center transition-all hover:shadow-md hover:scale-105 relative overflow-hidden border-2 w-full ${getShiftColor(shift.id)} bg-opacity-30 border-opacity-50`}>
+                                <p className="text-[9px] font-extrabold uppercase tracking-wider leading-tight">{getShiftLabel(shift.id)}</p>
+                                <p className="text-[8px] font-semibold mt-0.5 opacity-75">{getShiftTime(shift.id)}</p>
+                                <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 text-brand-600 transition-opacity"><Edit2 size={10} /></div>
+                              </div>
+                            );
+                          })}
+                          {shifts.filter(s => (daySchedule[s.id] || []).includes(emp.id)).length === 0 && (
+                            <div className="rounded-lg p-2 text-center bg-surface-200/40 border-2 border-surface-300/40 w-full">
+                              <p className="text-[9px] font-semibold text-surface-500">OFF</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderMonthlyGridView = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+    const EMPLOYEE_COL_WIDTH = 'w-48';
+    const DAY_COL_WIDTH = 'w-32';
+    const ROW_HEIGHT = 'h-20';
+
+    return (
+      <div className="bg-white border border-surface-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full">
+        <div className="flex shrink-0 border-b-2 border-surface-300">
+          <div className={`${EMPLOYEE_COL_WIDTH} flex-shrink-0 bg-gradient-to-br from-brand-500 via-brand-600 to-teal-700 border-r-2 border-surface-300 p-4 flex items-end justify-start`}>
+            <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">EMPLOYEE / ROLE</p>
+          </div>
+          <div className="flex-1 overflow-x-auto custom-scrollbar">
+            <div className="flex">
+              {monthDays.map((day) => {
+                const dateObj = new Date(year, month, day);
+                const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                return (
+                  <div key={day} className={`${DAY_COL_WIDTH} flex-shrink-0 py-3 px-2 text-center border-r-2 border-surface-300 last:border-r-0 ${isWeekend ? 'bg-gradient-to-br from-indigo-400 via-purple-500 to-indigo-600' : 'bg-gradient-to-br from-emerald-400 via-teal-500 to-emerald-600'}`}>
+                    <p className="text-[9px] font-bold text-white/80 uppercase tracking-widest mb-0.5">{WEEKDAYS[dateObj.getDay()]}</p>
+                    <p className="text-xl font-extrabold text-white">{day}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-hidden flex min-h-0">
+          <div className={`${EMPLOYEE_COL_WIDTH} flex-shrink-0 overflow-y-auto custom-scrollbar border-r-2 border-surface-300 bg-gradient-to-b from-surface-100 to-surface-50`}>
+            <div className="divide-y-2 divide-surface-300">
+              {employees.map(emp => (
+                <div key={emp.id} className={`${ROW_HEIGHT} p-3 bg-white hover:bg-surface-50/80 transition-colors flex items-center border-b border-surface-200`}>
+                  <div className="flex items-start gap-2 w-full">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs shadow-md">
+                      {emp.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-xs text-surface-800 truncate">{emp.name}</p>
+                      <p className="text-[9px] text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto custom-scrollbar">
+            <div className="inline-flex">
+              {monthDays.map((day) => {
+                const dateObj = new Date(year, month, day);
+                const dateKey = getSafeDateKey(dateObj);
+                const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+                const daySchedule = schedule?.[dateKey] || {};
+                return (
+                  <div key={day} className={`flex-shrink-0 ${DAY_COL_WIDTH} border-r-2 border-surface-300 last:border-r-0 divide-y-2 divide-surface-300 ${isWeekend ? 'bg-indigo-50/10' : 'bg-emerald-50/10'}`}>
+                    {employees.map(emp => (
+                      <div key={emp.id} className={`${ROW_HEIGHT} p-2 hover:bg-surface-50/50 transition-colors flex items-center justify-center border-b border-surface-200`}>
+                        <div className="w-full space-y-0.5 flex flex-col items-center justify-center">
+                          {shifts.map(shift => {
+                            const workers = daySchedule[shift.id] || [];
+                            const isAssigned = workers.includes(emp.id);
+                            if (!isAssigned) return null;
+                            return (
+                              <div key={shift.id} onClick={() => openEditModal(dateKey, shift.id, workers)} className={`group cursor-pointer rounded p-1 text-center transition-all hover:shadow-md hover:scale-105 relative overflow-hidden border w-full text-[7px] ${getShiftColor(shift.id)} bg-opacity-30 border-opacity-50`}>
+                                <p className="font-extrabold uppercase leading-tight">{getShiftLabel(shift.id)}</p>
+                              </div>
+                            );
+                          })}
+                          {shifts.filter(s => (daySchedule[s.id] || []).includes(emp.id)).length === 0 && (
+                            <div className="rounded p-1 text-center bg-surface-200/40 border border-surface-300/40 w-full">
+                              <p className="text-[7px] font-semibold text-surface-500">OFF</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 space-y-5 animate-in fade-in duration-300">
       {/* ─── Current Shift Header Bar ─────────────────────────────────── */}
@@ -407,6 +688,10 @@ export default function RosterDashboard({ onNavigateToConfig }) {
             <button onClick={() => setViewMode('week')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${viewMode === 'week' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><CalendarDays size={16} /> Weekly</button>
             <button onClick={() => setViewMode('month')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${viewMode === 'month' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><Grid size={16} /> Monthly</button>
           </div>
+          <div className="flex bg-surface-100 p-1 rounded-xl border border-surface-200/60 shadow-inner">
+            <button onClick={() => setLayoutMode('grid')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${layoutMode === 'grid' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><LayoutGrid size={16} /> Grid</button>
+            <button onClick={() => setLayoutMode('table')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${layoutMode === 'table' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><Table2 size={16} /> Table</button>
+          </div>
           <div className="flex items-center bg-surface-50 border border-surface-200 rounded-xl p-1 shadow-sm">
             <button onClick={() => navigateDate(-1)} className="p-1.5 hover:bg-white rounded-lg transition-colors"><ChevronLeft size={18} /></button>
             <span className="w-56 text-center font-bold text-surface-700 text-sm">{getDisplayDateRange()}</span>
@@ -428,9 +713,12 @@ export default function RosterDashboard({ onNavigateToConfig }) {
         </div>
       ) : (
         <div className="flex-1 min-h-0 flex flex-col animate-in fade-in duration-500">
-          {viewMode === 'day' && <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">{renderDailyView()}</div>}
-          {viewMode === 'week' && <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">{renderWeeklyView()}</div>}
-          {viewMode === 'month' && renderMonthlyGrid()}
+          {viewMode === 'day' && layoutMode === 'grid' && renderDailyGridView()}
+          {viewMode === 'day' && layoutMode === 'table' && <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">{renderDailyView()}</div>}
+          {viewMode === 'week' && layoutMode === 'grid' && renderWeeklyGridView()}
+          {viewMode === 'week' && layoutMode === 'table' && <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">{renderWeeklyView()}</div>}
+          {viewMode === 'month' && layoutMode === 'grid' && renderMonthlyGridView()}
+          {viewMode === 'month' && layoutMode === 'table' && renderMonthlyGrid()}
         </div>
       )}
 
