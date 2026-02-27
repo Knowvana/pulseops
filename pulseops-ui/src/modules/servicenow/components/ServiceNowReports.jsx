@@ -31,6 +31,23 @@ import {
 const txt = uiText.serviceNow.reports;
 const gridTxt = txt.grid;
 
+// Custom scrollbar styles for gradient theme
+const scrollbarStyles = `
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #8b5cf6, #9333ea);
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #7c3aed, #6b21a8);
+  }
+`;
+
 const PERIODS = [
   { id: 'daily', label: txt.periodToggle.daily },
   { id: 'weekly', label: txt.periodToggle.weekly },
@@ -105,7 +122,7 @@ function formatPeriodLabel(period, referenceDate) {
 // ─── REUSABLE SUB-COMPONENTS ─────────────────────────────────────────────────
 function StatCard({ label, value, suffix, color = 'from-violet-500 to-purple-600', icon: Icon }) {
   return (
-    <div className="bg-white rounded-xl border border-surface-200 shadow-sm p-4 text-center">
+    <div className="bg-white rounded-xl border border-surface-200 shadow-sm shadow-[0_0_5px_rgba(139,92,246,0.3),0_0_10px_rgba(147,51,234,0.2)] p-4 text-center">
       {Icon && <Icon size={18} className="text-surface-400 mx-auto mb-1" />}
       <p className={`text-2xl font-bold bg-gradient-to-br ${color} bg-clip-text text-transparent`}>
         {value !== null && value !== undefined ? value : '—'}
@@ -185,7 +202,7 @@ function SlaComplianceCard({ title, met, breached, compliance, target }) {
             </span>
           </div>
           <div className="w-full h-2 rounded-full bg-surface-200 overflow-hidden">
-            <div className={`h-full rounded-full ${compliance >= 80 ? 'bg-emerald-500' : compliance >= 50 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${compliance || 0}%` }} />
+            <div className={`h-full rounded-full bg-gradient-to-r ${compliance >= 80 ? 'from-emerald-400 to-emerald-600' : compliance >= 50 ? 'from-amber-400 to-amber-600' : 'from-red-400 to-red-600'}`} style={{ width: `${compliance || 0}%` }} />
           </div>
         </div>
       </div>
@@ -262,7 +279,7 @@ function DataGrid({ data, columns, columnLabels }) {
       </div>
 
       {/* Grid with internal scroll */}
-      <div className="overflow-auto max-h-[400px]">
+      <div className="overflow-auto max-h-[400px] custom-scrollbar">
         <table className="w-full text-xs">
           <thead className="bg-surface-50 sticky top-0 z-10">
             <tr>
@@ -313,6 +330,7 @@ function IncidentReport({ report, loading }) {
 
   return (
     <div className="space-y-4">
+      <div className="h-px bg-gradient-to-r from-violet-500 to-purple-600"></div>
       <ReportingPeriodBanner report={report} type="incidents" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label={txt.incidents.totalCount} value={report.totalCount} color="from-red-500 to-rose-600" icon={Bug} />
@@ -325,6 +343,7 @@ function IncidentReport({ report, loading }) {
         <BreakdownTable title={txt.incidents.byState} data={report.byState} />
         <BreakdownTable title={txt.incidents.byCategory} data={report.byCategory} />
       </div>
+      <div className="h-px bg-gradient-to-r from-violet-500 to-purple-600"></div>
       <h3 className="text-sm font-bold text-surface-800 mt-6">{txt.incidents.gridTitle}</h3>
       <DataGrid data={report.incidents} columns={defaultCols} columnLabels={report.stateMapping ? {} : {}} />
     </div>
@@ -545,6 +564,8 @@ export default function ServiceNowReports() {
 
   return (
     <div className="space-y-5 animate-fade-in">
+      <style dangerouslySetInnerHTML={{ __html: scrollbarStyles }} />
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-surface-900">{txt.pageTitle}</h1>
