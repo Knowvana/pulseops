@@ -73,6 +73,8 @@ import syncScheduler from '#modules/servicenow/utils/syncScheduler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONNECTION_CONFIG_PATH = join(__dirname, '..', 'config', 'servicenow_connection.json');
+const DEFAULT_CALLER_ID = 'abel.tuter@example.com';
+const DEFAULT_ASSIGNMENT_GROUP = 'Accessio';
 
 function readConnectionConfig() {
   try {
@@ -84,14 +86,89 @@ function readConnectionConfig() {
   }
 }
 
-function writeConnectionConfig(config) {
-  try {
-    writeFileSync(CONNECTION_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
-    return true;
-  } catch (err) {
-    logger.error('Failed to write ServiceNow connection config file', { error: err.message });
-    return false;
+function priorityToNumber(priorityLabel) {
+  if (!priorityLabel) return '3';
+  const match = String(priorityLabel).trim()[0];
+  return ['1', '2', '3', '4', '5'].includes(match) ? match : '3';
+}
+
+async function createIncidentInServiceNow(payload) {
+  const config = readConnectionConfig();
+  if (!config?.instanceUrl || !config?.username || !config?.password) {
+    return { success: false, error: 'ServiceNow connection is not configured' };
   }
+  const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+  const url = `${config.instanceUrl}/api/now/table/incident`;
+
+  const body = {
+    short_description: payload.shortDescription,
+    priority: priorityToNumber(payload.priority),
+    impact: payload.impact ? priorityToNumber(payload.impact) : '3', // Default to medium impact if not specified
+    urgency: payload.urgency ? priorityToNumber(payload.urgency) : '3', // Default to medium urgency if not specified
+    category: payload.category || 'general',
+    contact_type: payload.contactType || 'self-service',
+    caller_id: payload.callerId || DEFAULT_CALLER_ID,
+    assignment_group: payload.assignmentGroup || DEFAULT_ASSIGNMENT_GROUP,
+    state: payload.state || '1',
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text();
+    logger.error('ServiceNow create failed', { status: response.status, body: errBody });
+    return { success: false, error: `ServiceNow create failed (${response.status})`, details: errBody };
+  }
+  const data = await response.json();
+  const result = data?.result || {};
+  return { success: true, data: { sysId: result.sys_id, number: result.number } };
+}
+
+async function updateIncidentInServiceNow(sysId, payload) {
+  const config = readConnectionConfig();
+  if (!config?.instanceUrl || !config?.username || !config?.password) {
+    return { success: false, error: 'ServiceNow connection is not configured' };
+  }
+  if (!sysId) return { success: false, error: 'Missing sysId for ServiceNow incident' };
+  const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+  const url = `${config.instanceUrl}/api/now/table/incident/${sysId}`;
+
+  const body = {};
+  if (payload.shortDescription !== undefined) body.short_description = payload.shortDescription;
+  if (payload.priority !== undefined) body.priority = priorityToNumber(payload.priority);
+  if (payload.impact !== undefined) body.impact = priorityToNumber(payload.impact);
+  if (payload.urgency !== undefined) body.urgency = priorityToNumber(payload.urgency);
+  if (payload.category !== undefined) body.category = payload.category;
+  if (payload.state !== undefined) body.state = payload.state;
+  if (payload.assignmentGroup !== undefined) body.assignment_group = payload.assignmentGroup;
+  if (payload.assignedTo !== undefined) body.assigned_to = payload.assignedTo;
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text();
+    logger.error('ServiceNow update failed', { status: response.status, body: errBody });
+    return { success: false, error: `ServiceNow update failed (${response.status})`, details: errBody };
+  }
+  const data = await response.json();
+  const result = data?.result || {};
+  return { success: true, data: { sysId: result.sys_id, number: result.number } };
 }
 
 async function testServiceNowConnection(config) {
@@ -142,6 +219,102 @@ async function testServiceNowConnection(config) {
 }
 
 const router = Router();
+
+// ─── INCIDENT CRUD (used by Test Incidents page) ─────────────────────────────
+router.get('/incidents', authenticate, async (req, res, next) => {
+  try {
+    const incidents = await ServiceNowIncident.findAll({ order: [['openedAt', 'DESC']] });
+    return res.json(incidents);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/incidents', authenticate, authorize('admin', 'manager'), async (req, res, next) => {
+  try {
+    const {
+      number,
+      shortDescription,
+      priority = '3 - Medium',
+      state = 'New',
+      category = 'General',
+      impact = '3 - Low',
+      urgency = '3 - Low',
+      contactType = 'self-service',
+      assignmentGroup,
+      callerId,
+    } = req.body || {};
+
+    if (!shortDescription) {
+      return res.status(400).json({ error: 'shortDescription is required' });
+    }
+
+    const incNumber = number && number.trim() ? number.trim() : `INC${Date.now()}`;
+
+    // Create in ServiceNow first
+    const snResult = await createIncidentInServiceNow({
+      shortDescription,
+      priority,
+      impact,
+      urgency,
+      category,
+      contactType,
+      assignmentGroup: assignmentGroup || DEFAULT_ASSIGNMENT_GROUP,
+      callerId: callerId || DEFAULT_CALLER_ID,
+      state,
+    });
+    if (!snResult.success) {
+      return res.status(502).json({ error: snResult.error, details: snResult.details });
+    }
+
+    const created = await ServiceNowIncident.create({
+      number: snResult.data?.number || incNumber,
+      sysId: snResult.data?.sysId || null,
+      shortDescription,
+      priority,
+      state,
+      category,
+      impact,
+      urgency,
+      openedAt: new Date(),
+    });
+
+    return res.status(201).json(created);
+  } catch (err) {
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(409).json({ error: 'Incident number already exists' });
+    }
+    return next(err);
+  }
+});
+
+router.put('/incidents/:id', authenticate, authorize(['admin', 'manager']), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const incident = await ServiceNowIncident.findByPk(id);
+    if (!incident) return res.status(404).json({ error: 'Incident not found' });
+
+    const payload = {};
+    ['shortDescription', 'priority', 'state', 'category', 'impact', 'urgency', 'assignmentGroup', 'assignedTo'].forEach((field) => {
+      if (req.body && Object.prototype.hasOwnProperty.call(req.body, field)) {
+        payload[field] = req.body[field];
+      }
+    });
+
+    if (incident.sysId) {
+      const snResult = await updateIncidentInServiceNow(incident.sysId, payload);
+      if (!snResult.success) {
+        return res.status(502).json({ error: snResult.error, details: snResult.details });
+      }
+      if (snResult.data?.number) payload.number = snResult.data.number;
+    }
+
+    await incident.update(payload);
+    return res.json(incident);
+  } catch (err) {
+    return next(err);
+  }
+});
 
 // ─── HELPER: Date range filter builder ───────────────────────────────────────
 function buildDateFilter(period, dateField = 'openedAt') {
@@ -371,36 +544,6 @@ router.get('/incidents', authenticate, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/**
- * @swagger
- * /servicenow/incidents:
- *   post:
- *     tags: [ServiceNow - Incidents]
- *     summary: Create a new incident
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       201:
- *         description: Incident created
- */
-router.post('/incidents', authenticate, authorize('admin', 'manager'), async (req, res, next) => {
-  try {
-    const { number, shortDescription, description, priority, severity, state, category, subcategory, assignmentGroup, assignedTo, caller, contactType, impact, urgency, openedAt } = req.body;
-
-    if (!number || !shortDescription) {
-      return res.status(400).json({ success: false, error: { message: 'Number and shortDescription are required', code: 'VALIDATION_ERROR' } });
-    }
-
-    const incident = await ServiceNowIncident.create({
-      number, shortDescription, description, priority, severity, state,
-      category, subcategory, assignmentGroup, assignedTo, caller, contactType,
-      impact, urgency, openedAt: openedAt || new Date(),
-    });
-
-    logger.info('ServiceNow incident created', { number: incident.number, id: incident.id });
-    res.status(201).json({ success: true, data: incident });
-  } catch (err) { next(err); }
-});
 
 /**
  * @swagger

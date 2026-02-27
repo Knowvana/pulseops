@@ -32,11 +32,13 @@
 //   SideNav shows navItems → main area renders getViews/getConfigTabs
 // ============================================================================
 import React from 'react';
-import { Headset, LayoutDashboard, BarChart3, Sliders, Wifi, Clock, Timer, Database, RefreshCw } from 'lucide-react';
+import { Headset, LayoutDashboard, BarChart3, Sliders, Wifi, Clock, Timer, Database, RefreshCw, ActivitySquare, TestTube } from 'lucide-react';
 import uiText from '@shared/config/uiElementsText.json';
 
 import ServiceNowProvider from '@modules/servicenow/context/ServiceNowContext';
 import ServiceNowDashboard from '@modules/servicenow/components/ServiceNowDashboard';
+import ServiceNowDailyMonitoring from '@modules/servicenow/components/ServiceNowDailyMonitoring';
+import ServiceNowTestIncidents from '@modules/servicenow/components/ServiceNowTestIncidents';
 import ServiceNowReports from '@modules/servicenow/components/ServiceNowReports';
 import ServiceNowConfigConnection from '@modules/servicenow/components/ServiceNowConfigConnection';
 import ServiceNowConfigSla from '@modules/servicenow/components/ServiceNowConfigSla';
@@ -62,6 +64,8 @@ const servicenowManifest = {
 
   navItems: [
     { id: 'dashboard', label: navTxt.dashboard || 'Dashboard', icon: LayoutDashboard },
+    { id: 'daily_monitoring', label: navTxt.dailyMonitoring || 'Daily Monitoring', icon: ActivitySquare },
+    { id: 'test_incidents', label: navTxt.testIncidents || 'Test Incidents', icon: TestTube },
     { id: 'reports', label: navTxt.reports || 'Reports', icon: BarChart3 },
     { id: 'config', label: navTxt.config || 'Configuration', icon: Sliders },
   ],
@@ -70,6 +74,16 @@ const servicenowManifest = {
     dashboard: (
       <ServiceNowProvider>
         <ServiceNowDashboard />
+      </ServiceNowProvider>
+    ),
+    daily_monitoring: (
+      <ServiceNowProvider>
+        <ServiceNowDailyMonitoring />
+      </ServiceNowProvider>
+    ),
+    test_incidents: (
+      <ServiceNowProvider>
+        <ServiceNowTestIncidents />
       </ServiceNowProvider>
     ),
     reports: (
