@@ -364,6 +364,31 @@ const ServiceNowService = {
       return { success: false, error: err.message };
     }
   },
+
+  // ─── CONFIG SETTINGS ────────────────────────────────────────────────────
+  async getConfigSettings(category = null) {
+    try {
+      let url = urls.servicenowConfigSettingsEndpoint;
+      if (category) url += `?category=${category}`;
+      const res = await ApiClient.get(url);
+      Logger.info(LOG_SRC, snLogs.configFetched, { category });
+      return { success: true, data: res.data };
+    } catch (err) {
+      Logger.error(LOG_SRC, snLogs.configFetched, { error: err.message });
+      return { success: false, error: err.message };
+    }
+  },
+
+  async saveConfigSettings(settings) {
+    try {
+      const res = await ApiClient.put(urls.servicenowConfigSettingsEndpoint, { settings });
+      Logger.info(LOG_SRC, snLogs.connectionSaved, { count: settings.length });
+      return { success: true, data: res.data };
+    } catch (err) {
+      Logger.error(LOG_SRC, snLogs.connectionSaved, { error: err.message });
+      return { success: false, error: err.message };
+    }
+  },
 };
 
 export default ServiceNowService;

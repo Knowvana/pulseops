@@ -63,10 +63,11 @@ const ServiceNowSlaConfig = sequelize.define('ServiceNowSlaConfig', {
 }, {
   tableName: 'servicenow_sla_config',
   timestamps: true,
+  underscored: true,
   indexes: [
-    { fields: ['priority', 'recordType'], unique: true },
-    { fields: ['isActive'] },
-    { fields: ['isDemo'] },
+    { fields: ['priority', 'record_type'], unique: true },
+    { fields: ['is_active'] },
+    { fields: ['is_demo'] },
   ],
 });
 

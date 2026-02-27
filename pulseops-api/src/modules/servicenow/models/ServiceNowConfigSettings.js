@@ -56,10 +56,11 @@ const ServiceNowConfigSettings = sequelize.define('ServiceNowConfigSettings', {
 }, {
   tableName: 'servicenow_config_settings',
   timestamps: true,
+  underscored: true,
   indexes: [
     { fields: ['category', 'key'], unique: true },
     { fields: ['category'] },
-    { fields: ['isActive'] },
+    { fields: ['is_active'] },
   ],
 });
 

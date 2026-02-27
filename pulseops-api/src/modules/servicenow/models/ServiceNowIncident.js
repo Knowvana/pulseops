@@ -26,6 +26,11 @@ const ServiceNowIncident = sequelize.define('ServiceNowIncident', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+  sysId: {
+    type: DataTypes.STRING(32),
+    allowNull: true,
+    comment: 'ServiceNow sys_id',
+  },
   number: {
     type: DataTypes.STRING(20),
     allowNull: false,
@@ -80,7 +85,22 @@ const ServiceNowIncident = sequelize.define('ServiceNowIncident', {
   caller: {
     type: DataTypes.STRING(200),
     allowNull: true,
-    comment: 'Person who reported the incident',
+    comment: 'Person who reported the incident (caller_id)',
+  },
+  openedBy: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
+    comment: 'Person who opened the incident',
+  },
+  resolvedBy: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
+    comment: 'Person who resolved the incident',
+  },
+  closedBy: {
+    type: DataTypes.STRING(200),
+    allowNull: true,
+    comment: 'Person who closed the incident',
   },
   contactType: {
     type: DataTypes.STRING(50),
@@ -96,6 +116,16 @@ const ServiceNowIncident = sequelize.define('ServiceNowIncident', {
     type: DataTypes.STRING(20),
     defaultValue: '',
     comment: 'How quickly the incident needs resolution (numeric or text from ServiceNow)',
+  },
+  closeCode: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Close code from ServiceNow',
+  },
+  closeNotes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'Close notes from ServiceNow',
   },
   openedAt: {
     type: DataTypes.DATE,
@@ -141,12 +171,13 @@ const ServiceNowIncident = sequelize.define('ServiceNowIncident', {
 }, {
   tableName: 'servicenow_incidents',
   timestamps: true,
+  underscored: true,
   indexes: [
     { fields: ['number'], unique: true },
     { fields: ['state'] },
     { fields: ['priority'] },
-    { fields: ['openedAt'] },
-    { fields: ['isDemo'] },
+    { fields: ['opened_at'] },
+    { fields: ['is_demo'] },
   ],
 });
 

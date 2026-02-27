@@ -1,7 +1,7 @@
 # PulseOps Refactor — Standalone Product Build
 
-**Status:** Iteration 2 Complete — Module Management System, DB-backed Navigation, ShiftRoaster Enhancements  
-**Last Updated:** 2025 — Iteration 2
+**Status:** Iteration 3 Complete — ServiceNow Module Refactor (DB schema, API, UI)  
+**Last Updated:** 2025 — Iteration 3
 
 ---
 
@@ -40,6 +40,30 @@ Refactoring a multi-tenant SaaS application into a **standalone Kubernetes-ready
 - ✅ MODULE_BUILDING_GUIDE.md documentation
 - ✅ Server startup seeds module registry from modules.json (K8s-safe)
 - ✅ Only core system tables synced on startup; module tables on-demand
+
+### Iteration 3 Requirements (ServiceNow Module Refactor)
+- ✅ All Sequelize models use `underscored: true` for snake_case DB columns matching ServiceNow
+- ✅ New fields: sys_id, opened_by, resolved_by, closed_by, close_code, close_notes on Incident model
+- ✅ `servicenow_defaults.json` — default report columns, available columns, sync filters, state mappings, column labels
+- ✅ Schema seeding: `seedDefaultConfigSettings()` populates config_settings table on schema creation (preserves user changes)
+- ✅ Config Settings API: GET/PUT `/servicenow/config-settings` for report columns, sync filters, state mappings
+- ✅ Sync scheduler reads filter config (assignment_group, from_date) from config_settings table
+- ✅ Sync uses `sysparm_display_value=true` + `sysparm_limit=1000` for display strings
+- ✅ Full refresh sync: deletes non-demo records before re-syncing
+- ✅ Reference fields handled: `typeof obj === 'object' ? obj.display_value : obj`
+- ✅ SLA report: checks if SLA config + business hours exist, returns descriptive message if missing
+- ✅ SLA report: proper breach calculation (actual time vs SLA target per priority)
+- ✅ SLA report: reporting period details (dates, received/closed/received-and-closed counts)
+- ✅ SLA report: SLA explanation section (business hours, SLA targets, calculation method)
+- ✅ Incident/RITM reports: state mapping from config_settings (integer → string)
+- ✅ Incident/RITM reports: reporting period banner with received/closed counts
+- ✅ Reports UI: date navigator (prev/next for daily/weekly/monthly)
+- ✅ Reports UI: Generate Report button only (no auto-fetch on period change)
+- ✅ Reports UI: dynamic time formatting (d/h/m/s) instead of raw minutes
+- ✅ Reports UI: data grids with pagination, page size selector, column drag reorder, internal scroll
+- ✅ Reports UI: combined Incident + RITM SLA compliance tiles in 1 row
+- ✅ ServiceNow Configuration tab: column selection per record type, sync filter config
+- ✅ All UI text from `uiElementsText.json`, URLs from `urls.json`, logs from `logs.json`
 
 ---
 
@@ -661,6 +685,10 @@ Or set `--loglevel verbose` for npm commands.
 - ✅ src/modules/admin/views/SettingsDbObjects.jsx
 - ✅ src/modules/admin/views/SettingsAuth.jsx
 - ✅ src/modules/admin/views/SettingsLogging.jsx
+- ✅ src/modules/servicenow/manifest.jsx (+ ServiceNow Settings tab)
+- ✅ src/modules/servicenow/components/ServiceNowReports.jsx — **REWRITTEN** (date nav, generate button, grids, dynamic time, SLA explanation)
+- ✅ src/modules/servicenow/components/ServiceNowConfigSettings.jsx — **NEW** (column selection, sync filter config)
+- ✅ src/modules/servicenow/services/servicenowService.js (+ getConfigSettings, saveConfigSettings)
 - ✅ Dockerfile
 - ✅ nginx.conf
 - ✅ .gitignore
@@ -701,6 +729,17 @@ Or set `--loglevel verbose` for npm commands.
 - ✅ src/core/routes/logsRoutes.js
 - ✅ src/core/routes/moduleRoutes.js — **NEW** (full module lifecycle API)
 - ✅ src/modules/roster/routes/rosterRoutes.js (+ shifts, employees, leaves CRUD, current-shift, stats)
+- ✅ src/modules/servicenow/models/ServiceNowIncident.js — **UPDATED** (underscored: true, sys_id, opened_by, resolved_by, closed_by, close_code, close_notes)
+- ✅ src/modules/servicenow/models/ServiceNowRitm.js — **UPDATED** (underscored: true)
+- ✅ src/modules/servicenow/models/ServiceNowChange.js — **UPDATED** (underscored: true)
+- ✅ src/modules/servicenow/models/ServiceNowSlaConfig.js — **UPDATED** (underscored: true)
+- ✅ src/modules/servicenow/models/ServiceNowBusinessHours.js — **UPDATED** (underscored: true)
+- ✅ src/modules/servicenow/models/ServiceNowConfigSettings.js — **UPDATED** (underscored: true)
+- ✅ src/modules/servicenow/models/ServiceNowConnectionConfig.js — **UPDATED** (underscored: true)
+- ✅ src/modules/servicenow/config/servicenow_defaults.json — **NEW** (default report columns, filters, state mappings, labels)
+- ✅ src/modules/servicenow/schema.js — **UPDATED** (seeds default config settings from defaults.json)
+- ✅ src/modules/servicenow/routes/servicenowRoutes.js — **UPDATED** (config-settings API, SLA report rewrite, state mapping, reporting period)
+- ✅ src/modules/servicenow/utils/syncScheduler.js — **UPDATED** (filter config, full refresh, display values, new fields)
 - ✅ Dockerfile
 - ✅ .gitignore
 
@@ -720,6 +759,15 @@ Or set `--loglevel verbose` for npm commands.
 - Settings has 4 sub-tabs that dynamically replace SideNav items
 - Kubernetes-ready architecture with stateless pods and health probes
 - Ready for horizontal scaling and multi-pod deployments
+
+### Iteration 3 — ServiceNow Refactor Architecture Decisions
+- All DB models use `underscored: true` so Sequelize maps camelCase fields to snake_case columns (matching ServiceNow API)
+- `servicenow_defaults.json` centralizes all default config — seeded on schema creation, user changes preserved via `findOrCreate`
+- Sync scheduler does **full refresh** (delete non-demo → re-insert) to avoid stale data; filters applied server-side via `sysparm_query`
+- SLA compliance calculated by comparing actual response/resolution minutes vs SLA targets per priority — no business-hours-adjusted calculation yet (calendar minutes only)
+- Reports fetch all 4 report types in parallel on "Generate" click — no auto-fetch on period/date change
+- DataGrid is a reusable inline component with drag-reorder columns, pagination, page size, and internal scroll (no page-level scrollbars)
+- Config Settings tab allows admins to select which columns appear in grids and configure sync filters (assignment group, from date)
 
 ### UI Replication from operationsmanager
 - TopNav: Brand mark + module tabs + role badge + user menu + right panel toggle

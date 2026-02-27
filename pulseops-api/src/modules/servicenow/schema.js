@@ -35,6 +35,7 @@ import ServiceNowConfigSettings from './models/ServiceNowConfigSettings.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const demoData = require('./demoData_ServiceNow.json');
+const defaultsConfig = require('./config/servicenow_defaults.json');
 
 const REQUIRED_TABLES = [
   'servicenow_incidents',
@@ -85,6 +86,9 @@ export async function createSchema() {
 
     logger.info(logMessages.database.schemaCreated + ' (ServiceNow module)');
 
+    // Seed default config settings from servicenow_defaults.json
+    await seedDefaultConfigSettings();
+
     return {
       success: true,
       message: 'ServiceNow module schema created successfully',
@@ -94,6 +98,41 @@ export async function createSchema() {
   } catch (err) {
     logger.error(logMessages.database.syncFailed + ' (ServiceNow module)', { error: err.message });
     throw err;
+  }
+}
+
+/**
+ * Seed default configuration settings from servicenow_defaults.json.
+ * Inserts report column selections, sync filter defaults, and state mappings.
+ * Only inserts if the setting does not already exist (preserves user changes).
+ */
+async function seedDefaultConfigSettings() {
+  try {
+    const defaults = [
+      { category: 'report_columns', key: 'incidentColumns', value: JSON.stringify(defaultsConfig.reportColumns.incidents), description: 'Columns to show in Incident reports' },
+      { category: 'report_columns', key: 'ritmColumns', value: JSON.stringify(defaultsConfig.reportColumns.ritms), description: 'Columns to show in RITM reports' },
+      { category: 'report_columns', key: 'changeColumns', value: JSON.stringify(defaultsConfig.reportColumns.changes), description: 'Columns to show in Change reports' },
+      { category: 'sync_filter', key: 'assignmentGroup', value: defaultsConfig.syncFilter.assignmentGroup, description: 'Assignment group filter for ServiceNow data sync' },
+      { category: 'sync_filter', key: 'fromDate', value: defaultsConfig.syncFilter.fromDate, description: 'From date filter for ServiceNow data sync' },
+      { category: 'state_mapping', key: 'incidentStates', value: JSON.stringify(defaultsConfig.stateMapping.incident), description: 'Incident state integer to string mapping' },
+      { category: 'state_mapping', key: 'ritmStates', value: JSON.stringify(defaultsConfig.stateMapping.ritm), description: 'RITM state integer to string mapping' },
+      { category: 'state_mapping', key: 'changeStates', value: JSON.stringify(defaultsConfig.stateMapping.change), description: 'Change state integer to string mapping' },
+      { category: 'column_labels', key: 'columnLabels', value: JSON.stringify(defaultsConfig.columnLabels), description: 'Human-readable column labels' },
+      { category: 'available_columns', key: 'incidentAvailableColumns', value: JSON.stringify(defaultsConfig.availableColumns.incidents), description: 'All available incident columns' },
+      { category: 'available_columns', key: 'ritmAvailableColumns', value: JSON.stringify(defaultsConfig.availableColumns.ritms), description: 'All available RITM columns' },
+      { category: 'available_columns', key: 'changeAvailableColumns', value: JSON.stringify(defaultsConfig.availableColumns.changes), description: 'All available change columns' },
+    ];
+
+    for (const entry of defaults) {
+      await ServiceNowConfigSettings.findOrCreate({
+        where: { category: entry.category, key: entry.key },
+        defaults: { ...entry, isActive: true },
+      });
+    }
+
+    logger.info('ServiceNow default config settings seeded', { count: defaults.length });
+  } catch (err) {
+    logger.warn('Failed to seed default config settings', { error: err.message });
   }
 }
 

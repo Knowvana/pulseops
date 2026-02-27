@@ -582,6 +582,7 @@
       "tabs": {
         "connection": "ServiceNow Connection",
         "syncSchedule": "Sync Schedule",
+        "snSettings": "ServiceNow Settings",
         "sla": "SLA Configuration",
         "businessHours": "Business Hours",
         "dataManagement": "Data Management"
@@ -690,6 +691,12 @@
         "weekly": "Weekly",
         "monthly": "Monthly"
       },
+      "generateReport": "Generate Report",
+      "generating": "Generating...",
+      "reportingPeriod": "Reporting Period",
+      "totalReceived": "Total Received",
+      "totalClosed": "Total Closed",
+      "receivedAndClosed": "Received & Closed in Period",
       "incidents": {
         "title": "Incident Report",
         "totalCount": "Total Incidents",
@@ -698,7 +705,10 @@
         "byCategory": "By Category",
         "avgResponseTime": "Avg Response Time",
         "avgResolutionTime": "Avg Resolution Time",
-        "minutes": "min"
+        "minutes": "min",
+        "gridTitle": "Incident Details",
+        "responseSla": "Response SLA",
+        "resolutionSla": "Resolution SLA"
       },
       "ritms": {
         "title": "RITM Report",
@@ -708,7 +718,10 @@
         "byCatalogItem": "By Catalog Item",
         "avgResponseTime": "Avg Response Time",
         "avgFulfillmentTime": "Avg Fulfillment Time",
-        "minutes": "min"
+        "minutes": "min",
+        "gridTitle": "RITM Details",
+        "responseSla": "Response SLA",
+        "fulfillmentSla": "Fulfillment SLA"
       },
       "sla": {
         "title": "SLA Compliance Report",
@@ -721,7 +734,11 @@
         "target": "Target",
         "met": "Met",
         "breached": "Breached",
-        "compliancePercent": "Compliance %"
+        "compliancePercent": "Compliance %",
+        "notConfigured": "SLA configuration or business hours are not available.",
+        "howCalculated": "How SLA is Calculated",
+        "businessHoursLabel": "Business Hours",
+        "slaTargetsLabel": "SLA Targets"
       },
       "changes": {
         "title": "Change Report",
@@ -730,7 +747,36 @@
         "byState": "By State",
         "byRisk": "By Risk"
       },
+      "grid": {
+        "pageSize": "Page Size",
+        "showing": "Showing",
+        "of": "of",
+        "records": "records",
+        "noData": "No records found",
+        "page": "Page",
+        "prev": "Previous",
+        "next": "Next"
+      },
       "noData": "No data available for the selected period"
+    },
+    "snConfig": {
+      "title": "ServiceNow Configuration",
+      "description": "Configure report columns, data filters, and sync settings for ServiceNow integration",
+      "reportColumnsTitle": "Report Columns",
+      "reportColumnsDesc": "Select which columns to display in reports for each record type",
+      "incidentColumnsLabel": "Incident Report Columns",
+      "ritmColumnsLabel": "RITM Report Columns",
+      "changeColumnsLabel": "Change Report Columns",
+      "syncFilterTitle": "Data Sync Filter",
+      "syncFilterDesc": "Configure filters applied when syncing data from ServiceNow",
+      "assignmentGroupLabel": "Assignment Group",
+      "assignmentGroupPlaceholder": "e.g., Network Operations",
+      "fromDateLabel": "From Date",
+      "fromDatePlaceholder": "YYYY-MM-DD",
+      "saveButton": "Save Configuration",
+      "saving": "Saving...",
+      "saved": "Configuration saved successfully",
+      "saveFailed": "Failed to save configuration"
     }
   },
   "common": {

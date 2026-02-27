@@ -1,0 +1,120 @@
+{
+  "reportColumns": {
+    "incidents": [
+      "number", "short_description", "priority", "state", "category",
+      "assignment_group", "assigned_to", "opened_at", "resolved_at",
+      "response_time", "resolution_time"
+    ],
+    "ritms": [
+      "number", "short_description", "priority", "state", "catalog_item",
+      "assignment_group", "assigned_to", "opened_at", "fulfilled_at",
+      "response_time", "fulfillment_time"
+    ],
+    "changes": [
+      "number", "short_description", "type", "state", "risk",
+      "assignment_group", "assigned_to", "opened_at", "planned_start_date",
+      "planned_end_date"
+    ]
+  },
+  "availableColumns": {
+    "incidents": [
+      "number", "sys_id", "short_description", "description", "priority", "severity",
+      "state", "category", "subcategory", "assignment_group", "assigned_to",
+      "caller", "opened_by", "resolved_by", "closed_by", "contact_type",
+      "impact", "urgency", "close_code", "close_notes",
+      "opened_at", "resolved_at", "closed_at",
+      "response_time", "resolution_time",
+      "sla_response_breached", "sla_resolution_breached"
+    ],
+    "ritms": [
+      "number", "short_description", "description", "state", "priority",
+      "catalog_item", "requested_for", "requested_by",
+      "assignment_group", "assigned_to",
+      "opened_at", "fulfilled_at", "closed_at",
+      "response_time", "fulfillment_time",
+      "sla_response_breached", "sla_fulfillment_breached"
+    ],
+    "changes": [
+      "number", "short_description", "description", "type", "state",
+      "risk", "impact", "category",
+      "assignment_group", "assigned_to", "requested_by",
+      "planned_start_date", "planned_end_date",
+      "actual_start_date", "actual_end_date",
+      "opened_at", "closed_at"
+    ]
+  },
+  "syncFilter": {
+    "assignmentGroup": "",
+    "fromDate": ""
+  },
+  "stateMapping": {
+    "incident": {
+      "1": "New",
+      "2": "In Progress",
+      "3": "On Hold",
+      "4": "Awaiting Info",
+      "5": "Awaiting Problem",
+      "6": "Resolved",
+      "7": "Closed",
+      "8": "Cancelled"
+    },
+    "ritm": {
+      "1": "Open",
+      "2": "Work In Progress",
+      "3": "Closed Complete",
+      "4": "Closed Incomplete",
+      "-5": "Pending Approval"
+    },
+    "change": {
+      "-5": "New",
+      "-4": "Assess",
+      "-3": "Authorize",
+      "-2": "Scheduled",
+      "-1": "Implement",
+      "0": "Review",
+      "3": "Closed",
+      "4": "Cancelled"
+    }
+  },
+  "columnLabels": {
+    "number": "Number",
+    "sys_id": "Sys ID",
+    "short_description": "Short Description",
+    "description": "Description",
+    "priority": "Priority",
+    "severity": "Severity",
+    "state": "State",
+    "category": "Category",
+    "subcategory": "Subcategory",
+    "assignment_group": "Assignment Group",
+    "assigned_to": "Assigned To",
+    "caller": "Caller",
+    "opened_by": "Opened By",
+    "resolved_by": "Resolved By",
+    "closed_by": "Closed By",
+    "contact_type": "Contact Type",
+    "impact": "Impact",
+    "urgency": "Urgency",
+    "close_code": "Close Code",
+    "close_notes": "Close Notes",
+    "opened_at": "Opened At",
+    "resolved_at": "Resolved At",
+    "closed_at": "Closed At",
+    "fulfilled_at": "Fulfilled At",
+    "response_time": "Response Time",
+    "resolution_time": "Resolution Time",
+    "fulfillment_time": "Fulfillment Time",
+    "sla_response_breached": "Response SLA Breached",
+    "sla_resolution_breached": "Resolution SLA Breached",
+    "sla_fulfillment_breached": "Fulfillment SLA Breached",
+    "catalog_item": "Catalog Item",
+    "requested_for": "Requested For",
+    "requested_by": "Requested By",
+    "type": "Type",
+    "risk": "Risk",
+    "planned_start_date": "Planned Start",
+    "planned_end_date": "Planned End",
+    "actual_start_date": "Actual Start",
+    "actual_end_date": "Actual End"
+  }
+}

@@ -63,10 +63,11 @@ const ServiceNowBusinessHours = sequelize.define('ServiceNowBusinessHours', {
 }, {
   tableName: 'servicenow_business_hours',
   timestamps: true,
+  underscored: true,
   indexes: [
-    { fields: ['dayOfWeek'], unique: true },
-    { fields: ['isBusinessDay'] },
-    { fields: ['isDemo'] },
+    { fields: ['day_of_week'], unique: true },
+    { fields: ['is_business_day'] },
+    { fields: ['is_demo'] },
   ],
 });
 

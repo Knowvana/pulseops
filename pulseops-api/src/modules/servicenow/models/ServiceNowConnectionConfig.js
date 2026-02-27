@@ -87,9 +87,10 @@ const ServiceNowConnectionConfig = sequelize.define('ServiceNowConnectionConfig'
 }, {
   tableName: 'servicenow_connection_config',
   timestamps: true,
+  underscored: true,
   indexes: [
-    { fields: ['isActive'] },
-    { fields: ['isDemo'] },
+    { fields: ['is_active'] },
+    { fields: ['is_demo'] },
   ],
 });
 

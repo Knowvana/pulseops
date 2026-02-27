@@ -751,6 +751,54 @@ router.get('/schema-info', authenticate, async (req, res, next) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CONFIG SETTINGS (report columns, sync filters, state mappings)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+router.get('/config-settings', authenticate, async (req, res, next) => {
+  try {
+    const category = req.query.category;
+    const where = { isActive: true };
+    if (category) where.category = category;
+
+    const settings = await ServiceNowConfigSettings.findAll({ where, order: [['category', 'ASC'], ['key', 'ASC']] });
+    const grouped = {};
+    settings.forEach(s => {
+      if (!grouped[s.category]) grouped[s.category] = {};
+      grouped[s.category][s.key] = s.value;
+    });
+
+    logger.info('ServiceNow config settings fetched', { category, count: settings.length });
+    res.json({ success: true, data: grouped, raw: settings });
+  } catch (err) { next(err); }
+});
+
+router.put('/config-settings', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    const { settings } = req.body;
+    if (!Array.isArray(settings)) {
+      return res.status(400).json({ success: false, error: { message: 'settings array is required', code: 'VALIDATION_ERROR' } });
+    }
+
+    const results = [];
+    for (const entry of settings) {
+      const [record, created] = await ServiceNowConfigSettings.findOrCreate({
+        where: { category: entry.category, key: entry.key },
+        defaults: { value: entry.value, description: entry.description || '', isActive: true },
+      });
+      if (!created) {
+        record.value = entry.value;
+        if (entry.description) record.description = entry.description;
+        await record.save();
+      }
+      results.push(record);
+    }
+
+    logger.info('ServiceNow config settings saved', { count: results.length });
+    res.json({ success: true, data: results });
+  } catch (err) { next(err); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SYNC (manual trigger + status)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -963,18 +1011,23 @@ router.get('/reports/incidents', authenticate, async (req, res, next) => {
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     const where = buildCustomDateFilter(startDate, endDate, period);
-
-    logger.info('Incident Report: Date filter', { period, startDate, endDate, where });
+    const reportDates = computeReportingDates(startDate, endDate, period);
 
     const incidents = await ServiceNowIncident.findAll({ where, order: [['openedAt', 'DESC']] });
 
-    logger.info('Incident Report: Data fetched', { 
-      period, 
-      count: incidents.length,
-      dates: incidents.map(i => ({ number: i.number, openedAt: i.openedAt }))
-    });
+    // Load state mapping from config
+    let stateMapping = {};
+    try {
+      const stateSetting = await ServiceNowConfigSettings.findOne({ where: { category: 'state_mapping', key: 'incidentStates' } });
+      if (stateSetting) stateMapping = JSON.parse(stateSetting.value);
+    } catch (_) {}
 
-    // Aggregate by priority
+    const closedStates = ['Resolved', 'Closed', '6', '7'];
+    const totalClosed = incidents.filter(i => closedStates.includes(String(i.state))).length;
+    const totalReceivedAndClosed = incidents.filter(i =>
+      closedStates.includes(String(i.state)) && i.closedAt && new Date(i.closedAt) <= reportDates.end
+    ).length;
+
     const byPriority = {};
     const byState = {};
     const byCategory = {};
@@ -985,7 +1038,8 @@ router.get('/reports/incidents', authenticate, async (req, res, next) => {
 
     incidents.forEach(inc => {
       byPriority[inc.priority] = (byPriority[inc.priority] || 0) + 1;
-      byState[inc.state] = (byState[inc.state] || 0) + 1;
+      const stateLabel = stateMapping[String(inc.state)] || inc.state;
+      byState[stateLabel] = (byState[stateLabel] || 0) + 1;
       if (inc.category) byCategory[inc.category] = (byCategory[inc.category] || 0) + 1;
       if (inc.responseTime) { totalResponseTime += inc.responseTime; responseCount++; }
       if (inc.resolutionTime) { totalResolutionTime += inc.resolutionTime; resolutionCount++; }
@@ -993,12 +1047,16 @@ router.get('/reports/incidents', authenticate, async (req, res, next) => {
 
     const report = {
       period,
+      reportingPeriod: reportDates,
       totalCount: incidents.length,
+      totalClosed,
+      totalReceivedAndClosed,
       byPriority,
       byState,
       byCategory,
       averageResponseTime: responseCount > 0 ? Math.round(totalResponseTime / responseCount) : null,
       averageResolutionTime: resolutionCount > 0 ? Math.round(totalResolutionTime / resolutionCount) : null,
+      stateMapping,
       incidents,
     };
 
@@ -1013,8 +1071,22 @@ router.get('/reports/ritms', authenticate, async (req, res, next) => {
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     const where = buildCustomDateFilter(startDate, endDate, period);
+    const reportDates = computeReportingDates(startDate, endDate, period);
 
     const ritms = await ServiceNowRitm.findAll({ where, order: [['openedAt', 'DESC']] });
+
+    // Load state mapping from config
+    let stateMapping = {};
+    try {
+      const stateSetting = await ServiceNowConfigSettings.findOne({ where: { category: 'state_mapping', key: 'ritmStates' } });
+      if (stateSetting) stateMapping = JSON.parse(stateSetting.value);
+    } catch (_) {}
+
+    const closedStates = ['Fulfilled', 'Closed', 'Closed Complete', '3'];
+    const totalClosed = ritms.filter(r => closedStates.includes(String(r.state))).length;
+    const totalReceivedAndClosed = ritms.filter(r =>
+      closedStates.includes(String(r.state)) && r.fulfilledAt && new Date(r.fulfilledAt) <= reportDates.end
+    ).length;
 
     const byPriority = {};
     const byState = {};
@@ -1026,7 +1098,8 @@ router.get('/reports/ritms', authenticate, async (req, res, next) => {
 
     ritms.forEach(ritm => {
       byPriority[ritm.priority] = (byPriority[ritm.priority] || 0) + 1;
-      byState[ritm.state] = (byState[ritm.state] || 0) + 1;
+      const stateLabel = stateMapping[String(ritm.state)] || ritm.state;
+      byState[stateLabel] = (byState[stateLabel] || 0) + 1;
       if (ritm.catalogItem) byCatalogItem[ritm.catalogItem] = (byCatalogItem[ritm.catalogItem] || 0) + 1;
       if (ritm.responseTime) { totalResponseTime += ritm.responseTime; responseCount++; }
       if (ritm.fulfillmentTime) { totalFulfillmentTime += ritm.fulfillmentTime; fulfillmentCount++; }
@@ -1034,12 +1107,16 @@ router.get('/reports/ritms', authenticate, async (req, res, next) => {
 
     const report = {
       period,
+      reportingPeriod: reportDates,
       totalCount: ritms.length,
+      totalClosed,
+      totalReceivedAndClosed,
       byPriority,
       byState,
       byCatalogItem,
       averageResponseTime: responseCount > 0 ? Math.round(totalResponseTime / responseCount) : null,
       averageFulfillmentTime: fulfillmentCount > 0 ? Math.round(totalFulfillmentTime / fulfillmentCount) : null,
+      stateMapping,
       ritms,
     };
 
@@ -1055,111 +1132,221 @@ router.get('/reports/sla', authenticate, async (req, res, next) => {
     const endDate = req.query.endDate;
     const dateFilter = buildCustomDateFilter(startDate, endDate, period);
 
-    logger.info('SLA Report: Date filter', { period, startDate, endDate, dateFilter });
-
-    const [incidents, ritms, slaConfigs] = await Promise.all([
-      ServiceNowIncident.findAll({ where: dateFilter, order: [['openedAt', 'DESC']] }),
-      ServiceNowRitm.findAll({ where: dateFilter, order: [['openedAt', 'DESC']] }),
+    // Check if SLA config and business hours exist
+    const [slaConfigs, businessHours] = await Promise.all([
       ServiceNowSlaConfig.findAll({ where: { isActive: true } }),
+      ServiceNowBusinessHours.findAll(),
     ]);
 
-    logger.info('SLA Report: Data fetched', { 
-      period, 
-      incidentCount: incidents.length, 
-      ritmCount: ritms.length,
-      incidentDates: incidents.map(i => ({ number: i.number, openedAt: i.openedAt }))
-    });
+    const hasSlaConfig = slaConfigs.length > 0;
+    const hasBusinessHours = businessHours.length > 0;
+
+    if (!hasSlaConfig || !hasBusinessHours) {
+      return res.json({
+        success: true,
+        data: {
+          period,
+          hasSlaConfig,
+          hasBusinessHours,
+          message: !hasSlaConfig && !hasBusinessHours
+            ? 'SLA Configuration and Business Hours are not configured. Please configure them in the Configuration section.'
+            : !hasSlaConfig
+              ? 'SLA Configuration is not available. Please configure SLA targets in the Configuration section.'
+              : 'Business Hours are not configured. Please configure business hours in the Configuration section.',
+          incidentSla: null,
+          ritmSla: null,
+        },
+      });
+    }
+
+    // Build business hours lookup for SLA calculation
+    const bhMap = {};
+    businessHours.forEach(bh => { bhMap[bh.dayOfWeek] = bh; });
+
+    const [incidents, ritms] = await Promise.all([
+      ServiceNowIncident.findAll({ where: dateFilter, order: [['openedAt', 'DESC']] }),
+      ServiceNowRitm.findAll({ where: dateFilter, order: [['openedAt', 'DESC']] }),
+    ]);
 
     // Build SLA lookup map
     const slaMap = {};
     slaConfigs.forEach(s => { slaMap[`${s.recordType}:${s.priority}`] = s; });
 
-    // Incident SLA compliance - calculate based on actual response/resolution times
-    const incWithResponse = incidents.filter(i => i.responseTime !== null);
-    const incWithResolution = incidents.filter(i => i.resolutionTime !== null);
-    
+    // Calculate reporting period details
+    const reportDates = computeReportingDates(startDate, endDate, period);
+    const closedStates = ['Resolved', 'Closed', '6', '7'];
+
+    const incidentsClosed = incidents.filter(i => closedStates.includes(String(i.state)));
+    const incidentsReceivedAndClosed = incidents.filter(i =>
+      closedStates.includes(String(i.state)) && i.closedAt && new Date(i.closedAt) <= reportDates.end
+    );
+
+    // Incident SLA compliance using actual response/resolution vs SLA targets
+    let incResponseMet = 0, incResponseBreached = 0;
+    let incResolutionMet = 0, incResolutionBreached = 0;
+    const incByPriority = {};
+
+    incidents.forEach(inc => {
+      const sla = slaMap[`incident:${inc.priority}`];
+      const respBreached = sla && inc.responseTime !== null ? inc.responseTime > sla.responseTimeMinutes : null;
+      const resolBreached = sla && inc.resolutionTime !== null ? inc.resolutionTime > sla.resolutionTimeMinutes : null;
+
+      if (respBreached === true) incResponseBreached++;
+      else if (respBreached === false) incResponseMet++;
+      if (resolBreached === true) incResolutionBreached++;
+      else if (resolBreached === false) incResolutionMet++;
+
+      if (!incByPriority[inc.priority]) {
+        incByPriority[inc.priority] = {
+          total: 0, responseTarget: sla?.responseTimeMinutes || null, resolutionTarget: sla?.resolutionTimeMinutes || null,
+          responseMet: 0, responseBreached: 0, resolutionMet: 0, resolutionBreached: 0,
+        };
+      }
+      const p = incByPriority[inc.priority];
+      p.total++;
+      if (respBreached === true) p.responseBreached++;
+      else if (respBreached === false) p.responseMet++;
+      if (resolBreached === true) p.resolutionBreached++;
+      else if (resolBreached === false) p.resolutionMet++;
+    });
+
+    // Calculate compliance percentages per priority
+    Object.values(incByPriority).forEach(p => {
+      const respTotal = p.responseMet + p.responseBreached;
+      const resolTotal = p.resolutionMet + p.resolutionBreached;
+      p.responseCompliance = respTotal > 0 ? Math.round((p.responseMet / respTotal) * 100) : null;
+      p.resolutionCompliance = resolTotal > 0 ? Math.round((p.resolutionMet / resolTotal) * 100) : null;
+    });
+
+    const incRespTotal = incResponseMet + incResponseBreached;
+    const incResolTotal = incResolutionMet + incResolutionBreached;
+
     const incidentSla = {
       total: incidents.length,
-      responseBreached: 0,
-      resolutionBreached: 0,
-      responseMet: incWithResponse.length,
-      resolutionMet: incWithResolution.length,
-      byPriority: {},
+      totalClosed: incidentsClosed.length,
+      totalReceivedAndClosed: incidentsReceivedAndClosed.length,
+      responseMet: incResponseMet,
+      responseBreached: incResponseBreached,
+      resolutionMet: incResolutionMet,
+      resolutionBreached: incResolutionBreached,
+      responseCompliancePercent: incRespTotal > 0 ? Math.round((incResponseMet / incRespTotal) * 100) : null,
+      resolutionCompliancePercent: incResolTotal > 0 ? Math.round((incResolutionMet / incResolTotal) * 100) : null,
+      byPriority: incByPriority,
     };
 
-    // Calculate per-priority compliance - extract unique priorities from actual data
-    const uniqueIncidentPriorities = [...new Set(incidents.map(i => i.priority).filter(p => p))];
-    uniqueIncidentPriorities.forEach(priority => {
-      const prioIncidents = incidents.filter(i => i.priority === priority);
-      const sla = slaMap[`incident:${priority}`];
-      const prioWithResponse = prioIncidents.filter(i => i.responseTime !== null);
-      const prioWithResolution = prioIncidents.filter(i => i.resolutionTime !== null);
-      
-      incidentSla.byPriority[priority] = {
-        total: prioIncidents.length,
-        responseTarget: sla?.responseTimeMinutes || null,
-        resolutionTarget: sla?.resolutionTimeMinutes || null,
-        responseMet: prioWithResponse.length,
-        responseBreached: 0,
-        resolutionMet: prioWithResolution.length,
-        resolutionBreached: 0,
-        responseCompliance: prioWithResponse.length > 0 ? 100 : null,
-        resolutionCompliance: prioWithResolution.length > 0 ? 100 : null,
-      };
+    // RITM SLA compliance
+    const ritmsClosed = ritms.filter(r => ['Fulfilled', 'Closed', 'Closed Complete', '3'].includes(String(r.state)));
+    const ritmsReceivedAndClosed = ritms.filter(r =>
+      ['Fulfilled', 'Closed', 'Closed Complete', '3'].includes(String(r.state)) && r.fulfilledAt && new Date(r.fulfilledAt) <= reportDates.end
+    );
+
+    let ritmResponseMet = 0, ritmResponseBreached = 0;
+    let ritmFulfillmentMet = 0, ritmFulfillmentBreached = 0;
+    const ritmByPriority = {};
+
+    ritms.forEach(ritm => {
+      const sla = slaMap[`ritm:${ritm.priority}`];
+      const respBreached = sla && ritm.responseTime !== null ? ritm.responseTime > sla.responseTimeMinutes : null;
+      const fulfBreached = sla && ritm.fulfillmentTime !== null ? ritm.fulfillmentTime > sla.resolutionTimeMinutes : null;
+
+      if (respBreached === true) ritmResponseBreached++;
+      else if (respBreached === false) ritmResponseMet++;
+      if (fulfBreached === true) ritmFulfillmentBreached++;
+      else if (fulfBreached === false) ritmFulfillmentMet++;
+
+      if (!ritmByPriority[ritm.priority]) {
+        ritmByPriority[ritm.priority] = {
+          total: 0, responseTarget: sla?.responseTimeMinutes || null, fulfillmentTarget: sla?.resolutionTimeMinutes || null,
+          responseMet: 0, responseBreached: 0, fulfillmentMet: 0, fulfillmentBreached: 0,
+        };
+      }
+      const p = ritmByPriority[ritm.priority];
+      p.total++;
+      if (respBreached === true) p.responseBreached++;
+      else if (respBreached === false) p.responseMet++;
+      if (fulfBreached === true) p.fulfillmentBreached++;
+      else if (fulfBreached === false) p.fulfillmentMet++;
     });
 
-    // Overall compliance percentages
-    incidentSla.responseCompliancePercent = incWithResponse.length > 0 ? 100 : null;
-    incidentSla.resolutionCompliancePercent = incWithResolution.length > 0 ? 100 : null;
+    Object.values(ritmByPriority).forEach(p => {
+      const respTotal = p.responseMet + p.responseBreached;
+      const fulfTotal = p.fulfillmentMet + p.fulfillmentBreached;
+      p.responseCompliance = respTotal > 0 ? Math.round((p.responseMet / respTotal) * 100) : null;
+      p.fulfillmentCompliance = fulfTotal > 0 ? Math.round((p.fulfillmentMet / fulfTotal) * 100) : null;
+    });
 
-    // RITM SLA compliance - calculate based on actual response/fulfillment times
-    const ritmWithResponse = ritms.filter(r => r.responseTime !== null);
-    const ritmWithFulfillment = ritms.filter(r => r.fulfillmentTime !== null);
-    
+    const ritmRespTotal = ritmResponseMet + ritmResponseBreached;
+    const ritmFulfTotal = ritmFulfillmentMet + ritmFulfillmentBreached;
+
     const ritmSla = {
       total: ritms.length,
-      responseBreached: 0,
-      fulfillmentBreached: 0,
-      responseMet: ritmWithResponse.length,
-      fulfillmentMet: ritmWithFulfillment.length,
-      byPriority: {},
+      totalClosed: ritmsClosed.length,
+      totalReceivedAndClosed: ritmsReceivedAndClosed.length,
+      responseMet: ritmResponseMet,
+      responseBreached: ritmResponseBreached,
+      fulfillmentMet: ritmFulfillmentMet,
+      fulfillmentBreached: ritmFulfillmentBreached,
+      responseCompliancePercent: ritmRespTotal > 0 ? Math.round((ritmResponseMet / ritmRespTotal) * 100) : null,
+      fulfillmentCompliancePercent: ritmFulfTotal > 0 ? Math.round((ritmFulfillmentMet / ritmFulfTotal) * 100) : null,
+      byPriority: ritmByPriority,
     };
 
-    // Extract unique priorities from actual data
-    const uniqueRitmPriorities = [...new Set(ritms.map(r => r.priority).filter(p => p))];
-    uniqueRitmPriorities.forEach(priority => {
-      const prioRitms = ritms.filter(r => r.priority === priority);
-      const sla = slaMap[`ritm:${priority}`];
-      const prioWithResponse = prioRitms.filter(r => r.responseTime !== null);
-      const prioWithFulfillment = prioRitms.filter(r => r.fulfillmentTime !== null);
-      
-      ritmSla.byPriority[priority] = {
-        total: prioRitms.length,
-        responseTarget: sla?.responseTimeMinutes || null,
-        fulfillmentTarget: sla?.resolutionTimeMinutes || null,
-        responseMet: prioWithResponse.length,
-        responseBreached: 0,
-        fulfillmentMet: prioWithFulfillment.length,
-        fulfillmentBreached: 0,
-        responseCompliance: prioWithResponse.length > 0 ? 100 : null,
-        fulfillmentCompliance: prioWithFulfillment.length > 0 ? 100 : null,
-      };
-    });
-
-    ritmSla.responseCompliancePercent = ritmWithResponse.length > 0 ? 100 : null;
-    ritmSla.fulfillmentCompliancePercent = ritmWithFulfillment.length > 0 ? 100 : null;
+    // Build SLA explanation for UI
+    const slaExplanation = {
+      businessHours: businessHours.filter(bh => bh.isBusinessDay).map(bh => ({
+        day: bh.dayName,
+        start: bh.startTime,
+        end: bh.endTime,
+      })),
+      slaTargets: slaConfigs.map(s => ({
+        recordType: s.recordType,
+        priority: s.priority,
+        responseTimeMinutes: s.responseTimeMinutes,
+        resolutionTimeMinutes: s.resolutionTimeMinutes,
+      })),
+      calculationMethod: 'SLA compliance is calculated by comparing actual response/resolution times against configured SLA targets. Times are measured in calendar minutes from the opened_at timestamp.',
+    };
 
     const report = {
       period,
+      hasSlaConfig: true,
+      hasBusinessHours: true,
+      reportingPeriod: reportDates,
       incidentSla,
       ritmSla,
       slaTargets: slaConfigs,
+      slaExplanation,
     };
 
     logger.info('ServiceNow SLA report generated', { period, incidents: incidents.length, ritms: ritms.length });
     res.json({ success: true, data: report });
   } catch (err) { next(err); }
 });
+
+// Helper: compute reporting period date range
+function computeReportingDates(startDate, endDate, period) {
+  if (startDate && endDate) {
+    return { start: new Date(startDate), end: new Date(endDate), label: `${startDate} to ${endDate}` };
+  }
+  const now = new Date();
+  let start, end;
+  if (period === 'daily') {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  } else if (period === 'weekly') {
+    const day = now.getDay();
+    start = new Date(now);
+    start.setDate(now.getDate() - day);
+    start.setHours(0, 0, 0, 0);
+    end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+  } else {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  }
+  return { start, end, label: `${start.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}` };
+}
 
 router.get('/reports/changes', authenticate, async (req, res, next) => {
   try {

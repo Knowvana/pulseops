@@ -66,8 +66,37 @@ async function getSyncScheduleConfig() {
   }
 }
 
-async function fetchFromServiceNow(connConfig, endpoint) {
-  const url = `${connConfig.instanceUrl}/api/now/table/${endpoint}?sysparm_limit=100`;
+async function getSyncFilterConfig() {
+  try {
+    const settings = await ServiceNowConfigSettings.findAll({
+      where: { category: 'sync_filter', isActive: true },
+    });
+    const config = {};
+    settings.forEach(s => { config[s.key] = s.value; });
+    return {
+      assignmentGroup: config.assignmentGroup || '',
+      fromDate: config.fromDate || '',
+    };
+  } catch (err) {
+    logger.warn('SyncScheduler: Failed to read sync filter config', { error: err.message });
+    return { assignmentGroup: '', fromDate: '' };
+  }
+}
+
+async function fetchFromServiceNow(connConfig, endpoint, filters = {}) {
+  let url = `${connConfig.instanceUrl}/api/now/table/${endpoint}?sysparm_limit=1000&sysparm_display_value=true`;
+  
+  const queryParts = [];
+  if (filters.assignmentGroup) {
+    queryParts.push(`assignment_group=${filters.assignmentGroup}`);
+  }
+  if (filters.fromDate) {
+    queryParts.push(`opened_at>=${filters.fromDate}`);
+  }
+  if (queryParts.length > 0) {
+    url += `&sysparm_query=${queryParts.join('^')}`;
+  }
+
   const auth = Buffer.from(`${connConfig.username}:${connConfig.password}`).toString('base64');
 
   try {
@@ -92,8 +121,11 @@ async function fetchFromServiceNow(connConfig, endpoint) {
   }
 }
 
-async function syncIncidents(connConfig) {
-  const result = await fetchFromServiceNow(connConfig, 'incident');
+async function syncIncidents(connConfig, filters) {
+  // Full refresh: delete existing non-demo incidents then re-sync
+  await ServiceNowIncident.destroy({ where: { isDemo: false } });
+
+  const result = await fetchFromServiceNow(connConfig, 'incident', filters);
   if (!result.success) {
     logger.error('SyncScheduler: Failed to fetch incidents from ServiceNow', { error: result.error });
     return { synced: 0, error: result.error };
@@ -105,24 +137,22 @@ async function syncIncidents(connConfig) {
   
   for (const inc of result.data) {
     try {
-      // Accept whatever values ServiceNow returns - no hardcoded defaults
       const openedAt = inc.opened_at ? new Date(inc.opened_at) : new Date();
       const resolvedAt = inc.resolved_at ? new Date(inc.resolved_at) : null;
       const closedAt = inc.closed_at ? new Date(inc.closed_at) : null;
       
-      // Calculate response time (minutes from opened to first response/resolution)
       let responseTime = null;
       if (resolvedAt) {
         responseTime = Math.round((resolvedAt - openedAt) / (1000 * 60));
       }
       
-      // Calculate resolution time (minutes from opened to closed)
       let resolutionTime = null;
       if (closedAt) {
         resolutionTime = Math.round((closedAt - openedAt) / (1000 * 60));
       }
       
       const incidentData = {
+        sysId: inc.sys_id || null,
         number: inc.number,
         shortDescription: inc.short_description || '',
         description: inc.description || '',
@@ -131,12 +161,17 @@ async function syncIncidents(connConfig) {
         state: inc.state || '',
         category: inc.category || '',
         subcategory: inc.subcategory || '',
-        assignmentGroup: inc.assignment_group?.display_value || '',
-        assignedTo: inc.assigned_to?.display_value || '',
-        caller: inc.caller_id?.display_value || '',
+        assignmentGroup: typeof inc.assignment_group === 'object' ? (inc.assignment_group?.display_value || '') : (inc.assignment_group || ''),
+        assignedTo: typeof inc.assigned_to === 'object' ? (inc.assigned_to?.display_value || '') : (inc.assigned_to || ''),
+        caller: typeof inc.caller_id === 'object' ? (inc.caller_id?.display_value || '') : (inc.caller_id || ''),
+        openedBy: typeof inc.opened_by === 'object' ? (inc.opened_by?.display_value || '') : (inc.opened_by || ''),
+        resolvedBy: typeof inc.resolved_by === 'object' ? (inc.resolved_by?.display_value || '') : (inc.resolved_by || ''),
+        closedBy: typeof inc.closed_by === 'object' ? (inc.closed_by?.display_value || '') : (inc.closed_by || ''),
         contactType: inc.contact_type || '',
         impact: inc.impact || '',
         urgency: inc.urgency || '',
+        closeCode: inc.close_code || null,
+        closeNotes: inc.close_notes || null,
         openedAt,
         resolvedAt,
         closedAt,
@@ -176,18 +211,18 @@ async function syncIncidents(connConfig) {
   return { synced, total: result.data.length, failed };
 }
 
-async function syncRitms(connConfig) {
-  const result = await fetchFromServiceNow(connConfig, 'sc_req_item');
+async function syncRitms(connConfig, filters) {
+  await ServiceNowRitm.destroy({ where: { isDemo: false } });
+
+  const result = await fetchFromServiceNow(connConfig, 'sc_req_item', filters);
   if (!result.success) return { synced: 0, error: result.error };
 
   let synced = 0;
   for (const ritm of result.data) {
     try {
-      // Accept whatever values ServiceNow returns - no hardcoded defaults
       const openedAt = ritm.opened_at ? new Date(ritm.opened_at) : new Date();
       const fulfilledAt = ritm.closed_at ? new Date(ritm.closed_at) : null;
       
-      // Calculate fulfillment time (minutes from opened to fulfilled)
       let fulfillmentTime = null;
       if (fulfilledAt) {
         fulfillmentTime = Math.round((fulfilledAt - openedAt) / (1000 * 60));
@@ -199,11 +234,11 @@ async function syncRitms(connConfig) {
         description: ritm.description || '',
         state: ritm.state || '',
         priority: ritm.priority || '',
-        catalogItem: ritm.cat_item?.display_value || '',
-        requestedFor: ritm.request?.display_value || '',
-        requestedBy: ritm.opened_by?.display_value || '',
-        assignmentGroup: ritm.assignment_group?.display_value || '',
-        assignedTo: ritm.assigned_to?.display_value || '',
+        catalogItem: typeof ritm.cat_item === 'object' ? (ritm.cat_item?.display_value || '') : (ritm.cat_item || ''),
+        requestedFor: typeof ritm.request === 'object' ? (ritm.request?.display_value || '') : (ritm.request || ''),
+        requestedBy: typeof ritm.opened_by === 'object' ? (ritm.opened_by?.display_value || '') : (ritm.opened_by || ''),
+        assignmentGroup: typeof ritm.assignment_group === 'object' ? (ritm.assignment_group?.display_value || '') : (ritm.assignment_group || ''),
+        assignedTo: typeof ritm.assigned_to === 'object' ? (ritm.assigned_to?.display_value || '') : (ritm.assigned_to || ''),
         openedAt,
         fulfilledAt,
         fulfillmentTime,
@@ -217,14 +252,15 @@ async function syncRitms(connConfig) {
   return { synced, total: result.data.length };
 }
 
-async function syncChanges(connConfig) {
-  const result = await fetchFromServiceNow(connConfig, 'change_request');
+async function syncChanges(connConfig, filters) {
+  await ServiceNowChange.destroy({ where: { isDemo: false } });
+
+  const result = await fetchFromServiceNow(connConfig, 'change_request', filters);
   if (!result.success) return { synced: 0, error: result.error };
 
   let synced = 0;
   for (const chg of result.data) {
     try {
-      // Accept whatever values ServiceNow returns - no hardcoded defaults
       await ServiceNowChange.upsert({
         number: chg.number,
         shortDescription: chg.short_description || '',
@@ -234,9 +270,9 @@ async function syncChanges(connConfig) {
         risk: chg.risk || '',
         impact: chg.impact || '',
         category: chg.category || '',
-        assignmentGroup: chg.assignment_group?.display_value || '',
-        assignedTo: chg.assigned_to?.display_value || '',
-        requestedBy: chg.requested_by?.display_value || '',
+        assignmentGroup: typeof chg.assignment_group === 'object' ? (chg.assignment_group?.display_value || '') : (chg.assignment_group || ''),
+        assignedTo: typeof chg.assigned_to === 'object' ? (chg.assigned_to?.display_value || '') : (chg.assigned_to || ''),
+        requestedBy: typeof chg.requested_by === 'object' ? (chg.requested_by?.display_value || '') : (chg.requested_by || ''),
         plannedStartDate: chg.start_date ? new Date(chg.start_date) : null,
         plannedEndDate: chg.end_date ? new Date(chg.end_date) : null,
         openedAt: chg.opened_at ? new Date(chg.opened_at) : new Date(),
@@ -260,18 +296,19 @@ async function runSync() {
   }
 
   const scheduleConfig = await getSyncScheduleConfig();
+  const syncFilters = await getSyncFilterConfig();
   syncStatus = 'running';
   const results = { startedAt: new Date().toISOString(), incidents: null, ritms: null, changes: null };
 
   try {
     if (scheduleConfig.syncIncidents) {
-      results.incidents = await syncIncidents(connConfig);
+      results.incidents = await syncIncidents(connConfig, syncFilters);
     }
     if (scheduleConfig.syncRitms) {
-      results.ritms = await syncRitms(connConfig);
+      results.ritms = await syncRitms(connConfig, syncFilters);
     }
     if (scheduleConfig.syncChanges) {
-      results.changes = await syncChanges(connConfig);
+      results.changes = await syncChanges(connConfig, syncFilters);
     }
 
     results.completedAt = new Date().toISOString();

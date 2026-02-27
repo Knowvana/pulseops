@@ -119,12 +119,13 @@ const ServiceNowChange = sequelize.define('ServiceNowChange', {
 }, {
   tableName: 'servicenow_changes',
   timestamps: true,
+  underscored: true,
   indexes: [
     { fields: ['number'], unique: true },
     { fields: ['state'] },
     { fields: ['type'] },
-    { fields: ['openedAt'] },
-    { fields: ['isDemo'] },
+    { fields: ['opened_at'] },
+    { fields: ['is_demo'] },
   ],
 });
 

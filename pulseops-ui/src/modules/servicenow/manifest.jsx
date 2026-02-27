@@ -43,6 +43,7 @@ import ServiceNowConfigSla from '@modules/servicenow/components/ServiceNowConfig
 import ServiceNowConfigBusinessHours from '@modules/servicenow/components/ServiceNowConfigBusinessHours';
 import ServiceNowDataManagement from '@modules/servicenow/components/ServiceNowDataManagement';
 import ServiceNowConfigSyncSchedule from '@modules/servicenow/components/ServiceNowConfigSyncSchedule';
+import ServiceNowConfigSettings from '@modules/servicenow/components/ServiceNowConfigSettings';
 
 const navTxt = uiText.serviceNow.navItems;
 const cfgTxt = uiText.serviceNow.config;
@@ -96,6 +97,16 @@ const servicenowManifest = {
       content: (
         <ServiceNowProvider>
           <ServiceNowConfigSyncSchedule />
+        </ServiceNowProvider>
+      ),
+    },
+    {
+      id: 'sn_settings',
+      label: cfgTxt.tabs.snSettings,
+      icon: Sliders,
+      content: (
+        <ServiceNowProvider>
+          <ServiceNowConfigSettings />
         </ServiceNowProvider>
       ),
     },

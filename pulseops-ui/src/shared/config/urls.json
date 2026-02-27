@@ -42,5 +42,6 @@
   "servicenowSyncStatusEndpoint": "http://localhost:4000/api/servicenow/sync/status",
   "servicenowSyncScheduleEndpoint": "http://localhost:4000/api/servicenow/sync-schedule",
   "servicenowDemoDataEndpoint": "http://localhost:4000/api/servicenow/demo-data",
-  "servicenowAllDataEndpoint": "http://localhost:4000/api/servicenow/all"
+  "servicenowAllDataEndpoint": "http://localhost:4000/api/servicenow/all",
+  "servicenowConfigSettingsEndpoint": "http://localhost:4000/api/servicenow/config-settings"
 }

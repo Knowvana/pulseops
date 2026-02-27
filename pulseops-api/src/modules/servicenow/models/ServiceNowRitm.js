@@ -120,12 +120,13 @@ const ServiceNowRitm = sequelize.define('ServiceNowRitm', {
 }, {
   tableName: 'servicenow_ritms',
   timestamps: true,
+  underscored: true,
   indexes: [
     { fields: ['number'], unique: true },
     { fields: ['state'] },
     { fields: ['priority'] },
-    { fields: ['openedAt'] },
-    { fields: ['isDemo'] },
+    { fields: ['opened_at'] },
+    { fields: ['is_demo'] },
   ],
 });
 
