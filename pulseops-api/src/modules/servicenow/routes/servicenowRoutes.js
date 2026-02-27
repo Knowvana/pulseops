@@ -171,49 +171,68 @@ function buildDateFilter(period, dateField = 'openedAt') {
 async function calculateBusinessMinutes(startDate, endDate) {
   if (!startDate || !endDate) return null;
 
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (end <= start) return 0;
+
   const businessHours = await ServiceNowBusinessHours.findAll({
     where: { isBusinessDay: true },
     order: [['dayOfWeek', 'ASC']],
   });
 
   if (businessHours.length === 0) {
-    // No business hours configured, use raw minutes
-    return Math.round((new Date(endDate) - new Date(startDate)) / 60000);
+    return Math.round((end - start) / 60000);
   }
 
+  // Build map keyed by UTC day-of-week (0=Sun ... 6=Sat)
   const bhMap = {};
   businessHours.forEach(bh => {
-    bhMap[bh.dayOfWeek] = {
-      start: bh.startTime.split(':').map(Number),
-      end: bh.endTime.split(':').map(Number),
-    };
+    const [startHour, startMin] = bh.startTime.split(':').map(Number);
+    const [endHour, endMin] = bh.endTime.split(':').map(Number);
+    bhMap[bh.dayOfWeek] = { startHour, startMin, endHour, endMin };
   });
 
   let totalMinutes = 0;
-  const current = new Date(startDate);
-  const end = new Date(endDate);
 
-  while (current < end) {
-    const dow = current.getDay();
+  // Iterate day by day using UTC dates to avoid server timezone shifts
+  // current = midnight UTC of the current iteration day
+  const current = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+
+  const endDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
+
+  while (current <= endDay) {
+    const dow = current.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
     const bh = bhMap[dow];
 
     if (bh) {
-      const dayStart = new Date(current);
-      dayStart.setHours(bh.start[0], bh.start[1], 0, 0);
-      const dayEnd = new Date(current);
-      dayEnd.setHours(bh.end[0], bh.end[1], 0, 0);
+      // Business hours boundaries in UTC for this day
+      const dayBizStart = new Date(Date.UTC(
+        current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate(),
+        bh.startHour, bh.startMin, 0
+      ));
+      const dayBizEnd = new Date(Date.UTC(
+        current.getUTCFullYear(), current.getUTCMonth(), current.getUTCDate(),
+        bh.endHour, bh.endMin, 0
+      ));
 
-      const effectiveStart = current > dayStart ? current : dayStart;
-      const effectiveEnd = end < dayEnd ? end : dayEnd;
+      // Clamp to the actual incident window
+      const effectiveStart = start > dayBizStart ? start : dayBizStart;
+      const effectiveEnd   = end   < dayBizEnd   ? end   : dayBizEnd;
 
       if (effectiveStart < effectiveEnd) {
         totalMinutes += (effectiveEnd - effectiveStart) / 60000;
       }
     }
 
-    // Move to next day start
-    current.setDate(current.getDate() + 1);
-    current.setHours(0, 0, 0, 0);
+    // Advance by one UTC day
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  // If no business hours overlap at all (e.g. incident opened and closed on weekend),
+  // fall back to raw elapsed minutes so it is not silently marked as MET.
+  if (totalMinutes === 0) {
+    return Math.round((end - start) / 60000);
   }
 
   return Math.round(totalMinutes);
@@ -1181,15 +1200,30 @@ router.get('/reports/sla', authenticate, async (req, res, next) => {
       closedStates.includes(String(i.state)) && i.closedAt && new Date(i.closedAt) <= reportDates.end
     );
 
-    // Incident SLA compliance using actual response/resolution vs SLA targets
+    // Incident SLA compliance - calculate dynamically using business hours
     let incResponseMet = 0, incResponseBreached = 0;
     let incResolutionMet = 0, incResolutionBreached = 0;
     const incByPriority = {};
+    const incidentSlaDetails = [];
 
-    incidents.forEach(inc => {
+    for (const inc of incidents) {
       const sla = slaMap[`incident:${inc.priority}`];
-      const respBreached = sla && inc.responseTime !== null ? inc.responseTime > sla.responseTimeMinutes : null;
-      const resolBreached = sla && inc.resolutionTime !== null ? inc.resolutionTime > sla.resolutionTimeMinutes : null;
+
+      // Calculate response time in business minutes (openedAt to closedAt)
+      let respBreached = null;
+      let respMinutes = null;
+      if (sla && inc.closedAt) {
+        respMinutes = await calculateBusinessMinutes(inc.openedAt, inc.closedAt);
+        respBreached = respMinutes > sla.responseTimeMinutes;
+      }
+
+      // Calculate resolution time in business minutes (openedAt to closedAt)
+      let resolBreached = null;
+      let resolMinutes = null;
+      if (sla && inc.closedAt) {
+        resolMinutes = await calculateBusinessMinutes(inc.openedAt, inc.closedAt);
+        resolBreached = resolMinutes > sla.resolutionTimeMinutes;
+      }
 
       if (respBreached === true) incResponseBreached++;
       else if (respBreached === false) incResponseMet++;
@@ -1208,7 +1242,21 @@ router.get('/reports/sla', authenticate, async (req, res, next) => {
       else if (respBreached === false) p.responseMet++;
       if (resolBreached === true) p.resolutionBreached++;
       else if (resolBreached === false) p.resolutionMet++;
-    });
+
+      incidentSlaDetails.push({
+        id: inc.id,
+        number: inc.number,
+        shortDescription: inc.shortDescription,
+        priority: inc.priority,
+        state: inc.state,
+        openedAt: inc.openedAt,
+        closedAt: inc.closedAt,
+        slaResponseMet: respBreached === null ? null : !respBreached,
+        responseMinutes: respMinutes,
+        slaResolutionMet: resolBreached === null ? null : !resolBreached,
+        resolutionMinutes: resolMinutes,
+      });
+    }
 
     // Calculate compliance percentages per priority
     Object.values(incByPriority).forEach(p => {
@@ -1232,6 +1280,7 @@ router.get('/reports/sla', authenticate, async (req, res, next) => {
       responseCompliancePercent: incRespTotal > 0 ? Math.round((incResponseMet / incRespTotal) * 100) : null,
       resolutionCompliancePercent: incResolTotal > 0 ? Math.round((incResolutionMet / incResolTotal) * 100) : null,
       byPriority: incByPriority,
+      incidents: incidentSlaDetails,
     };
 
     // RITM SLA compliance
@@ -1244,10 +1293,22 @@ router.get('/reports/sla', authenticate, async (req, res, next) => {
     let ritmFulfillmentMet = 0, ritmFulfillmentBreached = 0;
     const ritmByPriority = {};
 
-    ritms.forEach(ritm => {
+    for (const ritm of ritms) {
       const sla = slaMap[`ritm:${ritm.priority}`];
-      const respBreached = sla && ritm.responseTime !== null ? ritm.responseTime > sla.responseTimeMinutes : null;
-      const fulfBreached = sla && ritm.fulfillmentTime !== null ? ritm.fulfillmentTime > sla.resolutionTimeMinutes : null;
+      
+      // Calculate response time in business minutes (openedAt to fulfilledAt)
+      let respBreached = null;
+      if (sla && ritm.fulfilledAt) {
+        const respMinutes = await calculateBusinessMinutes(ritm.openedAt, ritm.fulfilledAt);
+        respBreached = respMinutes > sla.responseTimeMinutes;
+      }
+
+      // Calculate fulfillment time in business minutes (openedAt to closedAt)
+      let fulfBreached = null;
+      if (sla && ritm.closedAt) {
+        const fulfMinutes = await calculateBusinessMinutes(ritm.openedAt, ritm.closedAt);
+        fulfBreached = fulfMinutes > sla.resolutionTimeMinutes;
+      }
 
       if (respBreached === true) ritmResponseBreached++;
       else if (respBreached === false) ritmResponseMet++;
@@ -1266,7 +1327,7 @@ router.get('/reports/sla', authenticate, async (req, res, next) => {
       else if (respBreached === false) p.responseMet++;
       if (fulfBreached === true) p.fulfillmentBreached++;
       else if (fulfBreached === false) p.fulfillmentMet++;
-    });
+    }
 
     Object.values(ritmByPriority).forEach(p => {
       const respTotal = p.responseMet + p.responseBreached;

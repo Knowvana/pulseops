@@ -738,7 +738,28 @@
         "notConfigured": "SLA configuration or business hours are not available.",
         "howCalculated": "How SLA is Calculated",
         "businessHoursLabel": "Business Hours",
-        "slaTargetsLabel": "SLA Targets"
+        "slaTargetsLabel": "SLA Targets",
+        "table": {
+          "priority": "Priority",
+          "type": "Type",
+          "target": "Target",
+          "met": "Met",
+          "breached": "Breached",
+          "compliance": "Compliance %"
+        },
+        "incidentGrid": {
+          "title": "Incident Details",
+          "number": "Incident #",
+          "description": "Description",
+          "priority": "Priority",
+          "state": "State",
+          "openedAt": "Opened",
+          "closedAt": "Closed",
+          "responseSla": "Response SLA",
+          "responseTime": "Response Time",
+          "resolutionSla": "Resolution SLA",
+          "resolutionTime": "Resolution Time"
+        }
       },
       "changes": {
         "title": "Change Report",

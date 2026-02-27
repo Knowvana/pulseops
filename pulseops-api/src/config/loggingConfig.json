@@ -1,5 +1,5 @@
 {
-  "logLevel": "info",
+  "logLevel": "debug",
   "consoleOutput": true,
   "captureApiCalls": true,
   "captureUiLogs": true,
@@ -12,5 +12,5 @@
     "platform_admin": true,
     "shift_roster": true
   },
-  "updatedAt": "2026-02-26T12:50:11.626Z"
+  "updatedAt": "2026-02-27T13:42:36.013Z"
 }

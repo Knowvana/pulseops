@@ -18,14 +18,14 @@
 // USED BY:
 //   - src/modules/servicenow/manifest.jsx — rendered for 'reports' view
 // ============================================================================
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { LoadingSpinner } from '@shared';
 import ServiceNowService from '@modules/servicenow/services/servicenowService';
 import uiText from '@shared/config/uiElementsText.json';
 import {
   BarChart3, Bug, FileText, Shield, GitPullRequest,
   CheckCircle2, Clock, TrendingUp, AlertTriangle, Calendar,
-  ChevronLeft, ChevronRight, Loader2, Info
+  ChevronLeft, ChevronRight, Loader2, Info, ChevronUp, ChevronDown
 } from 'lucide-react';
 
 const txt = uiText.serviceNow.reports;
@@ -34,17 +34,17 @@ const gridTxt = txt.grid;
 // Custom scrollbar styles for gradient theme
 const scrollbarStyles = `
   .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
     background: #f1f5f9;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: linear-gradient(to bottom, #8b5cf6, #9333ea);
+    background: linear-gradient(to bottom, #c4b5fd, #d8b4fe);
     border-radius: 4px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(to bottom, #7c3aed, #6b21a8);
+    background: linear-gradient(to bottom, #a78bfa, #c084fc);
   }
 `;
 
@@ -189,52 +189,37 @@ function ReportingPeriodBanner({ report, type }) {
   );
 }
 
-function SlaComplianceCard({ title, met, breached, compliance, target }) {
-  return (
-    <div className="bg-white rounded-xl border border-surface-200 shadow-sm p-4">
-      <h4 className="text-xs font-bold text-surface-700 mb-3">{title}</h4>
-      <div className="flex items-center gap-4 mb-3">
-        <div className="flex-1">
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-surface-500">{txt.sla.compliancePercent}</span>
-            <span className={`font-bold ${compliance >= 80 ? 'text-emerald-600' : compliance >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
-              {compliance !== null && compliance !== undefined ? `${compliance}%` : '—'}
-            </span>
-          </div>
-          <div className="w-full h-2 rounded-full bg-surface-200 overflow-hidden">
-            <div className={`h-full rounded-full bg-gradient-to-r ${compliance >= 80 ? 'from-emerald-400 to-emerald-600' : compliance >= 50 ? 'from-amber-400 to-amber-600' : 'from-red-400 to-red-600'}`} style={{ width: `${compliance || 0}%` }} />
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-center">
-        {target !== null && target !== undefined && (
-          <div>
-            <p className="text-xs text-surface-500">{txt.sla.target}</p>
-            <p className="text-sm font-semibold text-surface-800">{formatDuration(target)}</p>
-          </div>
-        )}
-        <div>
-          <p className="text-xs text-surface-500">{txt.sla.met}</p>
-          <p className="text-sm font-semibold text-emerald-600">{met ?? 0}</p>
-        </div>
-        <div>
-          <p className="text-xs text-surface-500">{txt.sla.breached}</p>
-          <p className="text-sm font-semibold text-red-600">{breached ?? 0}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-// ─── DATA GRID with pagination, page size, internal scroll ───────────────────
+// ─── DATA GRID with column separators and resizing ──────────────────────────────────
 function DataGrid({ data, columns, columnLabels }) {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [dragCol, setDragCol] = useState(null);
   const [colOrder, setColOrder] = useState(columns);
+  const [colWidths, setColWidths] = useState({});
+  const [resizeMeta, setResizeMeta] = useState(null);
 
-  const totalPages = Math.ceil((data?.length || 0) / pageSize);
-  const paged = useMemo(() => (data || []).slice(page * pageSize, (page + 1) * pageSize), [data, page, pageSize]);
+  const [sortBy, setSortBy] = useState(null);
+  const [sortDirection, setSortDirection] = useState('asc');
+
+  const sortedData = useMemo(() => {
+    if (!data || !sortBy) return data || [];
+    return [...data].sort((a, b) => {
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
+      // Handle dates if they are strings like '2023-01-01'
+      if (typeof aVal === 'string' && /^\d{4}-\d{2}-\d{2}/.test(aVal)) {
+        aVal = new Date(aVal);
+        bVal = new Date(bVal);
+      }
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [data, sortBy, sortDirection]);
+
+  const totalPages = Math.ceil(sortedData.length / pageSize);
+  const paged = useMemo(() => sortedData.slice(page * pageSize, (page + 1) * pageSize), [sortedData, page, pageSize]);
 
   const handleDragStart = (col) => setDragCol(col);
   const handleDrop = (targetCol) => {
@@ -247,6 +232,40 @@ function DataGrid({ data, columns, columnLabels }) {
     setColOrder(newOrder);
     setDragCol(null);
   };
+
+  const handleMouseMove = useCallback((e) => {
+    if (!resizeMeta) return;
+    const delta = e.clientX - resizeMeta.startX;
+    const newWidth = Math.max(80, resizeMeta.startWidth + delta);
+    setColWidths(prev => ({ ...prev, [resizeMeta.col]: `${newWidth}px` }));
+  }, [resizeMeta]);
+
+  const handleMouseUp = useCallback(() => {
+    setResizeMeta(null);
+  }, []);
+
+  const startResize = (e, col) => {
+    const thEl = e.currentTarget?.parentElement;
+    if (!thEl) return;
+    const { width } = thEl.getBoundingClientRect();
+    setResizeMeta({ col, startX: e.clientX, startWidth: width });
+  };
+
+  // Add event listeners when resizing
+  useEffect(() => {
+    if (resizeMeta) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+  }, [resizeMeta, handleMouseMove, handleMouseUp]);
 
   if (!data || data.length === 0) return <p className="text-sm text-surface-500 text-center py-8">{gridTxt.noData}</p>;
 
@@ -280,13 +299,34 @@ function DataGrid({ data, columns, columnLabels }) {
 
       {/* Grid with internal scroll */}
       <div className="overflow-auto max-h-[400px] custom-scrollbar">
-        <table className="w-full text-xs">
+        <table className="w-full text-xs table-fixed">
           <thead className="bg-surface-50 sticky top-0 z-10">
             <tr>
               {colOrder.filter(c => columns.includes(c)).map(col => (
                 <th key={col} draggable onDragStart={() => handleDragStart(col)} onDragOver={e => e.preventDefault()} onDrop={() => handleDrop(col)}
-                  className="px-3 py-2.5 text-left font-semibold text-surface-700 whitespace-nowrap border-b border-surface-200 cursor-grab select-none hover:bg-surface-100">
-                  {columnLabels?.[col] || col.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                  className="px-3 py-2.5 text-left font-semibold text-surface-700 whitespace-nowrap border-b border-surface-200 border-r border-surface-100 cursor-pointer select-none hover:bg-surface-100 relative"
+                  style={{ width: colWidths[col] || 'auto', minWidth: '80px' }}>
+                  <div onClick={() => {
+                    if (sortBy === col) {
+                      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortBy(col);
+                      setSortDirection('asc');
+                    }
+                  }}>
+                    <span className="block truncate">
+                      {columnLabels?.[col] || col.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                    </span>
+                    {sortBy === col && (sortDirection === 'asc' ? <ChevronUp size={14} className="inline ml-1" /> : <ChevronDown size={14} className="inline ml-1" />)}
+                  </div>
+                  {/* Resize handle */}
+                  <div
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent hover:bg-violet-300 opacity-0 hover:opacity-100 transition-opacity"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      startResize(e, col);
+                    }}
+                  />
                 </th>
               ))}
             </tr>
@@ -295,7 +335,7 @@ function DataGrid({ data, columns, columnLabels }) {
             {paged.map((row, i) => (
               <tr key={row.id || row.number || i} className="hover:bg-violet-50/30 transition-colors">
                 {colOrder.filter(c => columns.includes(c)).map(col => (
-                  <td key={col} className="px-3 py-2 whitespace-nowrap border-b border-surface-50 text-surface-700">{renderCell(row, col)}</td>
+                  <td key={col} className="px-3 py-2 whitespace-nowrap border-b border-surface-50 border-r border-surface-100 text-surface-700 truncate" style={{ width: colWidths[col] || 'auto', minWidth: '80px' }}>{renderCell(row, col)}</td>
                 ))}
               </tr>
             ))}
@@ -377,6 +417,209 @@ function RitmReport({ report, loading }) {
   );
 }
 
+// ─── SLA COMPLIANCE TABLE ────────────────────────────────────────────────────
+function SlaComplianceTable({ title, rows, type }) {
+  const slaTxt = txt.sla.table;
+  if (!rows || rows.length === 0) return null;
+
+  // Sort rows by priority (P1, P2, P3, etc.)
+  const sortedRows = [...rows].sort((a, b) => {
+    const aPriority = parseInt(a.priorityLabel.replace(/\D/g, '')) || 999;
+    const bPriority = parseInt(b.priorityLabel.replace(/\D/g, '')) || 999;
+    return aPriority - bPriority;
+  });
+
+  const renderSlaCell = (compliance, met, breached, hasTarget, target) => {
+    if (!hasTarget) {
+      return <span className="text-surface-400 text-xs">— no SLA target</span>;
+    }
+    if (compliance === null || compliance === undefined) {
+      return <span className="text-surface-400">—</span>;
+    }
+    const barColor = compliance >= 80 ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
+      : compliance >= 50 ? 'bg-gradient-to-r from-amber-400 to-amber-600'
+      : 'bg-gradient-to-r from-red-400 to-red-600';
+    const textColor = compliance >= 80 ? 'text-emerald-600'
+      : compliance >= 50 ? 'text-amber-600'
+      : 'text-red-600';
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-surface-500">Expected:</span>
+          <span className="font-semibold text-surface-700">{target ? formatDuration(target) : '—'}</span>
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs text-surface-500">
+            <span>Actual:</span>
+            <span className={`font-bold ${textColor}`}>{compliance}%</span>
+            <span>({met} met, {breached} breach)</span>
+            <div className="h-2 w-12 rounded-full bg-surface-200 overflow-hidden">
+              <div className={`h-full rounded-full bg-gradient-to-r ${barColor} transition-all`} style={{ width: `${compliance}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-surface-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-surface-100 bg-gradient-to-r from-violet-50 to-purple-50">
+        <h3 className="text-sm font-bold text-surface-800">{title}</h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-surface-50">
+            <tr>
+              <th className="px-4 py-2.5 text-left font-semibold text-surface-600 whitespace-nowrap">{slaTxt.priority}</th>
+              <th className="px-4 py-2.5 text-left font-semibold text-surface-600 whitespace-nowrap">Response</th>
+              <th className="px-4 py-2.5 text-left font-semibold text-surface-600 whitespace-nowrap">Resolution</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRows.map((row, i) => {
+              const hasResponseTarget = row.responseTarget !== null && row.responseTarget !== undefined;
+              const hasResolutionTarget = row.resolutionTarget !== null && row.resolutionTarget !== undefined;
+              return (
+                <tr key={i} className={`border-t border-surface-50 ${i % 2 === 0 ? 'bg-white' : 'bg-surface-50/40'} hover:bg-violet-50/30 transition-colors`}>
+                  <td className="px-4 py-3 font-semibold text-surface-800 whitespace-nowrap align-top">
+                    {row.priorityLabel}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    {renderSlaCell(row.responseCompliance, row.responseMet, row.responseBreached, hasResponseTarget, row.responseTarget)}
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    {renderSlaCell(row.resolutionCompliance, row.resolutionMet, row.resolutionBreached, hasResolutionTarget, row.resolutionTarget)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── SLA INCIDENT DETAILS GRID ───────────────────────────────────────────────
+function SlaIncidentGrid({ incidents }) {
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortBy, setSortBy] = useState('openedAt');
+  const [sortDir, setSortDir] = useState('desc');
+  const gridTxtSla = txt.sla.incidentGrid;
+
+  const sorted = useMemo(() => {
+    if (!incidents) return [];
+    return [...incidents].sort((a, b) => {
+      let av = a[sortBy], bv = b[sortBy];
+      if (av === null || av === undefined) return 1;
+      if (bv === null || bv === undefined) return -1;
+      if (typeof av === 'string' && /^\d{4}/.test(av)) { av = new Date(av); bv = new Date(bv); }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [incidents, sortBy, sortDir]);
+
+  const totalPages = Math.ceil((sorted.length || 0) / pageSize);
+  const paged = useMemo(() => sorted.slice(page * pageSize, (page + 1) * pageSize), [sorted, page, pageSize]);
+
+  const handleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(col); setSortDir('asc'); }
+  };
+
+  const SortIcon = ({ col }) => sortBy === col
+    ? (sortDir === 'asc' ? <ChevronUp size={12} className="inline ml-0.5" /> : <ChevronDown size={12} className="inline ml-0.5" />)
+    : null;
+
+  const fmtDt = (v) => v ? new Date(v).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+  const SlaBadge = ({ met }) => {
+    if (met === null || met === undefined) return <span className="text-surface-400">—</span>;
+    return met
+      ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">✓ Met</span>
+      : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">✗ Breached</span>;
+  };
+
+  if (!incidents || incidents.length === 0) return null;
+
+  const cols = [
+    { key: 'number',          label: gridTxtSla.number },
+    { key: 'shortDescription',label: gridTxtSla.description },
+    { key: 'priority',        label: gridTxtSla.priority },
+    { key: 'state',           label: gridTxtSla.state },
+    { key: 'openedAt',        label: gridTxtSla.openedAt },
+    { key: 'closedAt',        label: gridTxtSla.closedAt },
+    { key: 'slaResponseMet',  label: gridTxtSla.responseSla },
+    { key: 'responseMinutes', label: gridTxtSla.responseTime },
+    { key: 'slaResolutionMet',label: gridTxtSla.resolutionSla },
+    { key: 'resolutionMinutes',label: gridTxtSla.resolutionTime },
+  ];
+
+  return (
+    <div className="bg-white rounded-xl border border-surface-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-surface-100 bg-gradient-to-r from-violet-50 to-purple-50 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-surface-800">{gridTxtSla.title}</h3>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-surface-500">{gridTxt.showing} {page * pageSize + 1}–{Math.min((page + 1) * pageSize, sorted.length)} {gridTxt.of} {sorted.length} {gridTxt.records}</span>
+          <span className="text-xs text-surface-500">{gridTxt.pageSize}:</span>
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
+            className="text-xs border border-surface-200 rounded px-2 py-1 focus:ring-2 focus:ring-violet-500 outline-none">
+            {PAGE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="overflow-auto max-h-[420px] custom-scrollbar">
+        <table className="w-full text-xs">
+          <thead className="bg-surface-50 sticky top-0 z-10">
+            <tr>
+              {cols.map(c => (
+                <th key={c.key} onClick={() => handleSort(c.key)}
+                  className="px-3 py-2.5 text-left font-semibold text-surface-600 whitespace-nowrap border-b border-surface-200 cursor-pointer select-none hover:bg-surface-100">
+                  {c.label}<SortIcon col={c.key} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {paged.map((row, i) => (
+              <tr key={row.id || row.number || i} className={`border-t border-surface-50 ${i % 2 === 0 ? 'bg-white' : 'bg-surface-50/40'} hover:bg-violet-50/30 transition-colors`}>
+                <td className="px-3 py-2 whitespace-nowrap font-medium text-violet-700">{row.number ?? '—'}</td>
+                <td className="px-3 py-2 max-w-[200px] truncate text-surface-700" title={row.shortDescription}>{row.shortDescription ?? '—'}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-surface-700">{row.priority ?? '—'}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-surface-700">{row.state ?? '—'}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-surface-600">{fmtDt(row.openedAt)}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-surface-600">{fmtDt(row.closedAt)}</td>
+                <td className="px-3 py-2 whitespace-nowrap"><SlaBadge met={row.slaResponseMet} /></td>
+                <td className="px-3 py-2 whitespace-nowrap text-surface-700">{row.responseMinutes !== null && row.responseMinutes !== undefined ? formatDuration(row.responseMinutes) : '—'}</td>
+                <td className="px-3 py-2 whitespace-nowrap"><SlaBadge met={row.slaResolutionMet} /></td>
+                <td className="px-3 py-2 whitespace-nowrap text-surface-700">{row.resolutionMinutes !== null && row.resolutionMinutes !== undefined ? formatDuration(row.resolutionMinutes) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-2.5 border-t border-surface-100 bg-surface-50/50">
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+            className="flex items-center gap-1 text-xs font-medium text-surface-600 disabled:opacity-40 hover:text-violet-600 transition-colors">
+            <ChevronLeft size={14} />{gridTxt.prev}
+          </button>
+          <span className="text-xs text-surface-500">{gridTxt.page} {page + 1} / {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+            className="flex items-center gap-1 text-xs font-medium text-surface-600 disabled:opacity-40 hover:text-violet-600 transition-colors">
+            {gridTxt.next}<ChevronRight size={14} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SLA COMPLIANCE REPORT ──────────────────────────────────────────────────
 function SlaReport({ report, loading }) {
   if (loading) return <div className="flex justify-center py-12"><LoadingSpinner /></div>;
@@ -394,6 +637,32 @@ function SlaReport({ report, loading }) {
   const { incidentSla, ritmSla, slaExplanation, reportingPeriod } = report;
   const rpStart = reportingPeriod?.start ? new Date(reportingPeriod.start).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   const rpEnd = reportingPeriod?.end ? new Date(reportingPeriod.end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
+  // Build table rows for incidents (one row per priority with Response and Resolution columns)
+  const incidentRows = Object.entries(incidentSla?.byPriority || {}).map(([priority, data]) => ({
+    priorityLabel: priority,
+    responseTarget: data.responseTarget,
+    responseMet: data.responseMet,
+    responseBreached: data.responseBreached,
+    responseCompliance: data.responseCompliance,
+    resolutionTarget: data.resolutionTarget,
+    resolutionMet: data.resolutionMet,
+    resolutionBreached: data.resolutionBreached,
+    resolutionCompliance: data.resolutionCompliance,
+  }));
+
+  // Build table rows for RITMs (one row per priority with Response and Fulfillment columns)
+  const ritmRows = Object.entries(ritmSla?.byPriority || {}).map(([priority, data]) => ({
+    priorityLabel: priority,
+    responseTarget: data.responseTarget,
+    responseMet: data.responseMet,
+    responseBreached: data.responseBreached,
+    responseCompliance: data.responseCompliance,
+    resolutionTarget: data.fulfillmentTarget,
+    resolutionMet: data.fulfillmentMet,
+    resolutionBreached: data.fulfillmentBreached,
+    resolutionCompliance: data.fulfillmentCompliance,
+  }));
 
   return (
     <div className="space-y-6">
@@ -423,14 +692,6 @@ function SlaReport({ report, loading }) {
         </div>
       </div>
 
-      {/* SLA Compliance Summary — Incident + RITM in 1 row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label={`${txt.sla.incidentCompliance} - ${txt.sla.responseCompliance}`} value={incidentSla?.responseCompliancePercent} suffix="%" color={incidentSla?.responseCompliancePercent >= 80 ? 'from-emerald-500 to-teal-600' : 'from-red-500 to-rose-600'} icon={CheckCircle2} />
-        <StatCard label={`${txt.sla.incidentCompliance} - ${txt.sla.resolutionCompliance}`} value={incidentSla?.resolutionCompliancePercent} suffix="%" color={incidentSla?.resolutionCompliancePercent >= 80 ? 'from-emerald-500 to-teal-600' : 'from-red-500 to-rose-600'} icon={CheckCircle2} />
-        <StatCard label={`${txt.sla.ritmCompliance} - ${txt.sla.responseCompliance}`} value={ritmSla?.responseCompliancePercent} suffix="%" color={ritmSla?.responseCompliancePercent >= 80 ? 'from-emerald-500 to-teal-600' : 'from-red-500 to-rose-600'} icon={CheckCircle2} />
-        <StatCard label={`${txt.sla.ritmCompliance} - ${txt.sla.fulfillmentCompliance}`} value={ritmSla?.fulfillmentCompliancePercent} suffix="%" color={ritmSla?.fulfillmentCompliancePercent >= 80 ? 'from-emerald-500 to-teal-600' : 'from-red-500 to-rose-600'} icon={CheckCircle2} />
-      </div>
-
       {/* SLA Explanation */}
       {slaExplanation && (
         <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
@@ -453,7 +714,7 @@ function SlaReport({ report, loading }) {
               <div className="space-y-0.5">
                 {(slaExplanation.slaTargets || []).map((s, i) => (
                   <p key={i} className="text-xs text-surface-500">
-                    {s.recordType} P{s.priority}: Response {formatDuration(s.responseTimeMinutes)}, Resolution {formatDuration(s.resolutionTimeMinutes)}
+                    {s.recordType} {s.priority}: {txt.sla.responseCompliance} {formatDuration(s.responseTimeMinutes)}, {txt.sla.resolutionCompliance} {formatDuration(s.resolutionTimeMinutes)}
                   </p>
                 ))}
               </div>
@@ -462,34 +723,19 @@ function SlaReport({ report, loading }) {
         </div>
       )}
 
-      {/* Incident SLA by Priority */}
-      {incidentSla && (
-        <div>
-          <h3 className="text-sm font-bold text-surface-800 mb-3">{txt.sla.incidentCompliance}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(incidentSla.byPriority || {}).map(([priority, data]) => (
-              <React.Fragment key={`inc-${priority}`}>
-                <SlaComplianceCard title={`P${priority} — ${txt.sla.responseCompliance}`} met={data.responseMet} breached={data.responseBreached} compliance={data.responseCompliance} target={data.responseTarget} />
-                <SlaComplianceCard title={`P${priority} — ${txt.sla.resolutionCompliance}`} met={data.resolutionMet} breached={data.resolutionBreached} compliance={data.resolutionCompliance} target={data.resolutionTarget} />
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
+      {/* Incident SLA Compliance Table */}
+      {incidentRows.length > 0 && (
+        <SlaComplianceTable title={txt.sla.incidentCompliance} rows={incidentRows} />
       )}
 
-      {/* RITM SLA by Priority */}
-      {ritmSla && (
-        <div>
-          <h3 className="text-sm font-bold text-surface-800 mb-3">{txt.sla.ritmCompliance}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(ritmSla.byPriority || {}).map(([priority, data]) => (
-              <React.Fragment key={`ritm-${priority}`}>
-                <SlaComplianceCard title={`P${priority} — ${txt.sla.responseCompliance}`} met={data.responseMet} breached={data.responseBreached} compliance={data.responseCompliance} target={data.responseTarget} />
-                <SlaComplianceCard title={`P${priority} — ${txt.sla.fulfillmentCompliance}`} met={data.fulfillmentMet} breached={data.fulfillmentBreached} compliance={data.fulfillmentCompliance} target={data.fulfillmentTarget} />
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
+      {/* RITM SLA Compliance Table */}
+      {ritmRows.length > 0 && (
+        <SlaComplianceTable title={txt.sla.ritmCompliance} rows={ritmRows} />
+      )}
+
+      {/* Incident Details Grid */}
+      {incidentSla?.incidents && incidentSla.incidents.length > 0 && (
+        <SlaIncidentGrid incidents={incidentSla.incidents} />
       )}
     </div>
   );
