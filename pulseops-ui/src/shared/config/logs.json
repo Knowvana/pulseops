@@ -42,6 +42,21 @@
       "employeeAdded": "Employee added to resource pool",
       "employeeRemoved": "Employee removed from resource pool"
     },
+    "servicenow": {
+      "healthChecked": "ServiceNow health check completed",
+      "connectionTested": "ServiceNow connection test performed",
+      "connectionSaved": "ServiceNow connection config saved",
+      "slaConfigSaved": "ServiceNow SLA configuration saved",
+      "businessHoursSaved": "ServiceNow business hours saved",
+      "incidentsFetched": "ServiceNow incidents loaded",
+      "ritmsFetched": "ServiceNow RITMs loaded",
+      "changesFetched": "ServiceNow changes loaded",
+      "reportGenerated": "ServiceNow report generated",
+      "demoLoaded": "ServiceNow demo data loaded",
+      "demoRemoved": "ServiceNow demo data removed",
+      "hardReset": "ServiceNow hard reset completed",
+      "configFetched": "ServiceNow configuration fetched"
+    },
     "user": {
       "created": "User created successfully",
       "updated": "User updated successfully",

@@ -48,6 +48,23 @@
       "configSaved": "Roster configuration saved",
       "configLoaded": "Roster configuration loaded"
     },
+    "servicenow": {
+      "healthCheck": "ServiceNow health check performed",
+      "connectionTested": "ServiceNow connection test: {status}",
+      "connectionSaved": "ServiceNow connection config saved",
+      "incidentCreated": "ServiceNow incident created: {number}",
+      "incidentUpdated": "ServiceNow incident updated: {number}",
+      "ritmCreated": "ServiceNow RITM created: {number}",
+      "ritmUpdated": "ServiceNow RITM updated: {number}",
+      "changeCreated": "ServiceNow change created: {number}",
+      "changeUpdated": "ServiceNow change updated: {number}",
+      "slaConfigSaved": "ServiceNow SLA configuration saved",
+      "businessHoursSaved": "ServiceNow business hours saved",
+      "reportGenerated": "ServiceNow {reportType} report generated for {period}",
+      "demoDataLoaded": "ServiceNow demo data loaded",
+      "demoDataRemoved": "ServiceNow demo data removed",
+      "hardReset": "ServiceNow hard reset completed"
+    },
     "modules": {
       "initializing": "Initializing module schema: {moduleId}",
       "initialized": "Module schema initialized: {moduleId}",

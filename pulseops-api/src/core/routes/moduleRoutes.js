@@ -49,6 +49,11 @@ async function getModuleSchema(moduleId) {
         MODULE_SCHEMAS[moduleId] = mod.default || mod;
         return MODULE_SCHEMAS[moduleId];
       }
+      case 'servicenow': {
+        const mod = await import('../../modules/servicenow/schema.js');
+        MODULE_SCHEMAS[moduleId] = mod.default || mod;
+        return MODULE_SCHEMAS[moduleId];
+      }
       default:
         return null;
     }
@@ -292,9 +297,15 @@ router.delete('/:id/data', authenticate, authorize('admin'), async (req, res, ne
       return res.status(400).json({ success: false, error: { message: 'Wipe not supported for this module', code: 'NOT_SUPPORTED' } });
     }
 
-    await schema.wipeModuleData();
+    const result = await schema.wipeModuleData();
+
+    // Mark module as uninitialized since tables are dropped
+    mod.initialized = false;
+    mod.schemaVersion = null;
+    await mod.save();
+
     logger.info(msg(logMessages.modules.dataWiped, { moduleId: req.params.id }));
-    res.json({ success: true, data: { message: 'Module data wiped successfully' } });
+    res.json({ success: true, data: { message: 'Module data wiped successfully', ...result } });
   } catch (err) { next(err); }
 });
 

@@ -33,6 +33,14 @@ import ShiftRoasterShift from '#modules/roster/models/ShiftRoasterShift.js';
 import ShiftRoasterEmployee from '#modules/roster/models/ShiftRoasterEmployee.js';
 import ShiftRoasterLeave from '#modules/roster/models/ShiftRoasterLeave.js';
 
+// --- ServiceNow Module Models ---
+import ServiceNowIncident from '#modules/servicenow/models/ServiceNowIncident.js';
+import ServiceNowRitm from '#modules/servicenow/models/ServiceNowRitm.js';
+import ServiceNowChange from '#modules/servicenow/models/ServiceNowChange.js';
+import ServiceNowSlaConfig from '#modules/servicenow/models/ServiceNowSlaConfig.js';
+import ServiceNowBusinessHours from '#modules/servicenow/models/ServiceNowBusinessHours.js';
+import ServiceNowConnectionConfig from '#modules/servicenow/models/ServiceNowConnectionConfig.js';
+
 // --- Associations ---
 ShiftRoasterLeave.belongsTo(ShiftRoasterEmployee, { foreignKey: 'employeeId', as: 'employee' });
 ShiftRoasterEmployee.hasMany(ShiftRoasterLeave, { foreignKey: 'employeeId', as: 'leaves' });
@@ -49,11 +57,20 @@ const models = {
   ShiftRoasterShift,
   ShiftRoasterEmployee,
   ShiftRoasterLeave,
+  // ServiceNow Module
+  ServiceNowIncident,
+  ServiceNowRitm,
+  ServiceNowChange,
+  ServiceNowSlaConfig,
+  ServiceNowBusinessHours,
+  ServiceNowConnectionConfig,
 };
 
 export {
   User, SystemConfig, SystemLog, SystemModule,
   RosterSchedule, RosterConfig,
   ShiftRoasterShift, ShiftRoasterEmployee, ShiftRoasterLeave,
+  ServiceNowIncident, ServiceNowRitm, ServiceNowChange,
+  ServiceNowSlaConfig, ServiceNowBusinessHours, ServiceNowConnectionConfig,
 };
 export default models;

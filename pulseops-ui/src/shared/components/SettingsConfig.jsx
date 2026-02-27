@@ -97,34 +97,38 @@ export default function SettingsConfig({
               const Icon = tab.icon;
               const isActive = tab.id === activeTabId;
               return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`
-                    flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg text-left
-                    transition-all duration-150
-                    ${isActive
-                      ? 'bg-gradient-to-r from-brand-50 to-white text-brand-700 shadow-sm ring-1 ring-surface-200/60 font-semibold'
-                      : 'text-surface-500 hover:text-surface-700 hover:bg-white/60'
-                    }
-                  `}
-                >
-                  {Icon && (
-                    <Icon
-                      size={16}
-                      className={isActive ? 'text-brand-500' : 'text-surface-400'}
-                    />
+                <React.Fragment key={tab.id}>
+                  {tab.separator && (
+                    <div className="my-2 mx-3 border-t border-surface-200" />
                   )}
-                  <span className="text-sm truncate">{tab.label}</span>
-                  {tab.badge && (
-                    <span className={`
-                      ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full
-                      ${isActive ? 'bg-brand-100 text-brand-600' : 'bg-surface-100 text-surface-400'}
-                    `}>
-                      {tab.badge}
-                    </span>
-                  )}
-                </button>
+                  <button
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`
+                      flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg text-left
+                      transition-all duration-150
+                      ${isActive
+                        ? 'bg-gradient-to-r from-brand-50 to-white text-brand-700 shadow-sm ring-1 ring-surface-200/60 font-semibold'
+                        : 'text-surface-500 hover:text-surface-700 hover:bg-white/60'
+                      }
+                    `}
+                  >
+                    {Icon && (
+                      <Icon
+                        size={16}
+                        className={isActive ? 'text-brand-500' : 'text-surface-400'}
+                      />
+                    )}
+                    <span className="text-sm truncate">{tab.label}</span>
+                    {tab.badge && (
+                      <span className={`
+                        ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full
+                        ${isActive ? 'bg-brand-100 text-brand-600' : 'bg-surface-100 text-surface-400'}
+                      `}>
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                </React.Fragment>
               );
             })}
           </nav>

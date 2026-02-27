@@ -63,21 +63,52 @@ const queryService = {
 
   async getTablesBySchema() {
     try {
-      // Use Sequelize's QueryInterface to get all tables in the schema
-      const allTables = await sequelize.getQueryInterface().showAllTables();
-      console.log('Tables found:', allTables);
-      return Array.isArray(allTables) ? allTables : [];
+      // Use raw SQL query to get table names from information_schema
+      const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${SCHEMA}' AND table_type = 'BASE TABLE' ORDER BY table_name`;
+      console.log('getTablesBySchema SQL:', { sql, SCHEMA });
+      const rows = await sequelize.query(sql, { type: QueryTypes.SELECT });
+      
+      // Sequelize returns results as arrays: [['table1'], ['table2'], ...]
+      // Extract the first element from each array
+      const tableNames = Array.isArray(rows) ? rows.map(r => {
+        // If row is an array, get first element; if object, get table_name field
+        if (Array.isArray(r)) {
+          return r[0]; // Extract first element from array
+        } else if (typeof r === 'object' && r !== null) {
+          return r.table_name; // Extract from object
+        }
+        return r; // Return as-is if neither
+      }).filter(t => t && typeof t === 'string') : [];
+      
+      console.log('getTablesBySchema result:', { tableNames, rowCount: rows.length, rawRows: rows });
+      return tableNames;
     } catch (err) {
-      console.error('getTablesBySchema error:', err.message);
-      // Fallback to raw query if showAllTables fails
-      try {
-        const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${SCHEMA}' AND table_type = 'BASE TABLE' ORDER BY table_name`;
-        const [rows] = await sequelize.query(sql);
-        return Array.isArray(rows) ? rows.map(r => r.table_name) : [];
-      } catch (fallbackErr) {
-        console.error('Fallback query also failed:', fallbackErr.message);
-        return [];
+      console.error('getTablesBySchema error:', { error: err.message, stack: err.stack, SCHEMA });
+      return [];
+    }
+  },
+
+  async tableExists(tableName) {
+    try {
+      const sql = `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = '${SCHEMA}' AND table_name = '${tableName}') AS exists`;
+      const rows = await sequelize.query(sql, { type: QueryTypes.SELECT });
+      
+      // Handle both array format [true/false] and object format { exists: true/false }
+      let result = false;
+      if (Array.isArray(rows) && rows.length > 0) {
+        const row = rows[0];
+        if (Array.isArray(row)) {
+          result = row[0] === true; // Extract first element from array
+        } else if (typeof row === 'object' && row !== null) {
+          result = row.exists === true; // Extract from object
+        }
       }
+      
+      console.log('tableExists result:', { tableName, exists: result, rawRows: rows });
+      return result;
+    } catch (err) {
+      console.error('tableExists error:', { tableName, error: err.message });
+      return false;
     }
   },
 
@@ -89,7 +120,15 @@ const queryService = {
 
   async dropTable(tableName) {
     const sql = resolveQuery(queries.database.dropTable, { tableName });
-    await sequelize.query(sql, { type: QueryTypes.RAW });
+    console.log('dropTable SQL:', { sql, tableName });
+    try {
+      const result = await sequelize.query(sql, { type: QueryTypes.RAW, raw: true });
+      console.log('dropTable result:', { tableName, result });
+      return result;
+    } catch (err) {
+      console.error('dropTable error:', { tableName, sql, error: err.message, stack: err.stack });
+      throw err;
+    }
   },
 
   async getEnumTypes() {

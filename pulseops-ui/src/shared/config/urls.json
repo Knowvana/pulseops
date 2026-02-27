@@ -21,5 +21,26 @@
   "databaseLoadDefaultDataEndpoint": "http://localhost:4000/api/database/load-default-data",
   "databaseLoadDemoDataEndpoint": "http://localhost:4000/api/database/load-demo-data",
   "databaseWipeEndpoint": "http://localhost:4000/api/database/wipe",
-  "databaseStatsEndpoint": "http://localhost:4000/api/database/stats"
+  "databaseStatsEndpoint": "http://localhost:4000/api/database/stats",
+
+  "servicenowEndpoint": "http://localhost:4000/api/servicenow",
+  "servicenowHealthEndpoint": "http://localhost:4000/api/servicenow/health",
+  "servicenowStatsEndpoint": "http://localhost:4000/api/servicenow/stats",
+  "servicenowIncidentsEndpoint": "http://localhost:4000/api/servicenow/incidents",
+  "servicenowRitmsEndpoint": "http://localhost:4000/api/servicenow/ritms",
+  "servicenowChangesEndpoint": "http://localhost:4000/api/servicenow/changes",
+  "servicenowConnectionEndpoint": "http://localhost:4000/api/servicenow/connection",
+  "servicenowConnectionTestEndpoint": "http://localhost:4000/api/servicenow/connection/test",
+  "servicenowSlaConfigEndpoint": "http://localhost:4000/api/servicenow/sla-config",
+  "servicenowBusinessHoursEndpoint": "http://localhost:4000/api/servicenow/business-hours",
+  "servicenowReportsIncidentsEndpoint": "http://localhost:4000/api/servicenow/reports/incidents",
+  "servicenowReportsRitmsEndpoint": "http://localhost:4000/api/servicenow/reports/ritms",
+  "servicenowReportsSlaEndpoint": "http://localhost:4000/api/servicenow/reports/sla",
+  "servicenowReportsChangesEndpoint": "http://localhost:4000/api/servicenow/reports/changes",
+  "servicenowSchemaInfoEndpoint": "http://localhost:4000/api/servicenow/schema-info",
+  "servicenowSyncEndpoint": "http://localhost:4000/api/servicenow/sync",
+  "servicenowSyncStatusEndpoint": "http://localhost:4000/api/servicenow/sync/status",
+  "servicenowSyncScheduleEndpoint": "http://localhost:4000/api/servicenow/sync-schedule",
+  "servicenowDemoDataEndpoint": "http://localhost:4000/api/servicenow/demo-data",
+  "servicenowAllDataEndpoint": "http://localhost:4000/api/servicenow/all"
 }

@@ -118,11 +118,17 @@ pulseops/
 │   │   │   ├── routes/             # auth, health, database, user, config, logs, modules
 │   │   │   └── logger.js           # Winston logger with JSON templates
 │   │   ├── modules/
-│   │   │   └── roster/
-│   │   │       ├── models/         # ShiftRoasterShift, Employee, Leave, Schedule, Config
-│   │   │       ├── routes/         # Full CRUD for shifts, employees, leaves, schedules
-│   │   │       ├── schema.js       # createSchema, verifySchema, loadDemoData, wipeModuleData
-│   │   │       └── demoData.json   # Sample data for StepWizard
+│   │   │   ├── roster/
+│   │   │   │   ├── models/         # ShiftRoasterShift, Employee, Leave, Schedule, Config
+│   │   │   │   ├── routes/         # Full CRUD for shifts, employees, leaves, schedules
+│   │   │   │   ├── schema.js       # createSchema, verifySchema, loadDemoData, wipeModuleData
+│   │   │   │   └── demoData.json   # Sample data for StepWizard
+│   │   │   └── servicenow/         # ServiceNow Integration module (Iteration 3)
+│   │   │       ├── models/         # Incident, Ritm, Change, SlaConfig, BusinessHours, ConnectionConfig
+│   │   │       ├── routes/         # Full CRUD + reports + connection config + data management
+│   │   │       ├── utils/          # encryption.js (AES-256-GCM for password encryption)
+│   │   │       ├── schema.js       # createSchema, verifySchema, loadDemoData, wipeDemoData, wipeModuleData
+│   │   │       └── demoData_ServiceNow.json  # 10 incidents, 10 RITMs, 10 changes, SLA + BH config
 │   │   ├── app.js                  # Express factory (middleware + routes)
 │   │   └── server.js               # Entry point (DB connect, graceful shutdown)
 │   ├── Dockerfile                  # Node.js non-root container
@@ -170,7 +176,15 @@ pulseops/
    - RosterSettings: Load demo data or wipe roster data
    - Utils: Roster generation algorithm, date key formatting
 
-2. **Platform Admin** (Accessible to: admin only)
+2. **ServiceNow Integration** (Accessible to: admin, manager, user) — **NEW in Iteration 3**
+   - ServiceNowDashboard: Connection health, API health, ticket counts, config summary
+   - ServiceNowReports: Incident, RITM, SLA Compliance, Change reports with daily/weekly/monthly toggle
+   - ServiceNowConfig: Connection settings (encrypted password), SLA targets by priority, Business hours
+   - ServiceNowSettings: Data management (load demo, remove demo, hard reset)
+   - Service: ServiceNowService (all API calls via ApiClient)
+   - Context: ServiceNowContext (centralized state for health, stats, config, data actions)
+
+3. **Platform Admin** (Accessible to: admin only)
    - **AdminOverview**: Health tiles (system health, modules, users, logs), database summary (4-column), recent activity with search, platform information
    - **LogsViewer**: System logs + API logs tabs, sortable columns, level filtering, search, right detail panel with JSON payloads
    - **Users**: CRUD placeholder (pending backend integration)
@@ -255,6 +269,36 @@ pulseops/
    - `DELETE /schedule/:year/:month` → Delete schedule
    - `GET /schedules` → List all saved schedules
 
+7. **ServiceNow** (`/api/servicenow`) — Authenticated — **NEW in Iteration 3**
+   - `GET /health` → Connection health check + API status
+   - `GET /stats` → Dashboard statistics (ticket counts, open/pending)
+   - `GET /incidents` → List incidents (filterable by state, priority, period)
+   - `POST /incidents` → Create incident (admin/manager)
+   - `GET /incidents/:id` → Get single incident
+   - `PUT /incidents/:id` → Update incident (admin/manager)
+   - `GET /ritms` → List RITMs (filterable)
+   - `POST /ritms` → Create RITM (admin/manager)
+   - `GET /ritms/:id` → Get single RITM
+   - `PUT /ritms/:id` → Update RITM (admin/manager)
+   - `GET /changes` → List changes (filterable)
+   - `POST /changes` → Create change (admin/manager)
+   - `GET /changes/:id` → Get single change
+   - `PUT /changes/:id` → Update change (admin/manager)
+   - `GET /connection` → Get connection config (password masked as ••••••••)
+   - `PUT /connection` → Save connection config (admin, password encrypted AES-256-GCM)
+   - `POST /connection/test` → Test ServiceNow connection (admin)
+   - `GET /sla-config` → Get SLA targets by priority
+   - `PUT /sla-config` → Save SLA configuration (admin)
+   - `GET /business-hours` → Get business hours config
+   - `PUT /business-hours` → Save business hours (admin)
+   - `GET /reports/incidents` → Incident report (daily/weekly/monthly)
+   - `GET /reports/ritms` → RITM report (daily/weekly/monthly)
+   - `GET /reports/sla` → SLA compliance report with per-priority breakdown
+   - `GET /reports/changes` → Change report (daily/weekly/monthly)
+   - `POST /demo-data` → Load demo data (admin)
+   - `DELETE /demo-data` → Remove demo data only (admin)
+   - `DELETE /all` → Hard reset all ServiceNow data (admin)
+
 ### Config Files (JSON)
 - `app.json` → Port, JWT secret, CORS, rate-limit, default admin credentials
 - `database.json` → PostgreSQL connection (host, port, user, password, pool config)
@@ -317,6 +361,43 @@ pulseops/
 
 9. **RosterConfig** (`shiftroaster_config` table)
    - id, shifts (JSONB), employees (JSONB), leaves (JSONB), isActive, updatedBy
+
+### ServiceNow Module Models — **NEW in Iteration 3**
+10. **ServiceNowIncident** (`servicenow_incidents` table)
+    - id (UUID), number (unique), shortDescription, description, priority, severity
+    - state, category, subcategory, assignmentGroup, assignedTo, caller, contactType
+    - impact, urgency, openedAt, resolvedAt, closedAt
+    - responseTime (minutes), resolutionTime (minutes)
+    - slaResponseBreached (boolean), slaResolutionBreached (boolean), isDemo
+
+11. **ServiceNowRitm** (`servicenow_ritms` table)
+    - id (UUID), number (unique), shortDescription, description, state, priority
+    - catalogItem, requestedFor, requestedBy, assignmentGroup, assignedTo
+    - openedAt, fulfilledAt, closedAt
+    - responseTime (minutes), fulfillmentTime (minutes)
+    - slaResponseBreached (boolean), slaFulfillmentBreached (boolean), isDemo
+
+12. **ServiceNowChange** (`servicenow_changes` table)
+    - id (UUID), number (unique), shortDescription, description, type, state
+    - risk, impact, category, assignmentGroup, assignedTo, requestedBy
+    - plannedStartDate, plannedEndDate, actualStartDate, actualEndDate
+    - openedAt, closedAt, isDemo
+
+13. **ServiceNowSlaConfig** (`servicenow_sla_config` table)
+    - id (UUID), priority, recordType (incident/ritm)
+    - responseTimeMinutes, resolutionTimeMinutes, isActive, isDemo
+    - Unique index on (priority, recordType)
+
+14. **ServiceNowBusinessHours** (`servicenow_business_hours` table)
+    - id (UUID), dayOfWeek (0-6), dayName, isBusinessDay
+    - startTime (HH:mm), endTime (HH:mm), isDemo
+    - Unique index on dayOfWeek
+
+15. **ServiceNowConnectionConfig** (`servicenow_connection_config` table)
+    - id (UUID), instanceUrl, username, encryptedPassword (AES-256-GCM)
+    - authMethod (basic/oauth2), apiVersion, connectionStatus (connected/disconnected/error/untested)
+    - lastTestedAt, lastError, isActive, isDemo
+    - Password NEVER returned in API responses (masked as ••••••••)
 
 ### Default Admin User
 - Email: `admin@pulseops.local`

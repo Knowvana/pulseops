@@ -26,6 +26,7 @@ import configRoutes from '#core/routes/configRoutes.js';
 import logsRoutes from '#core/routes/logsRoutes.js';
 import moduleRoutes from '#core/routes/moduleRoutes.js';
 import rosterRoutes from '#modules/roster/routes/rosterRoutes.js';
+import servicenowRoutes from '#modules/servicenow/routes/servicenowRoutes.js';
 
 const require = createRequire(import.meta.url);
 const appConfig = require('#config/app.json');
@@ -67,6 +68,7 @@ export default function createApp() {
   app.use(`${prefix}/logs`, logsRoutes);
   app.use(`${prefix}/modules`, moduleRoutes);
   app.use(`${prefix}/roster`, rosterRoutes);
+  app.use(`${prefix}/servicenow`, servicenowRoutes);
 
   // --- Swagger UI ---
   const swaggerSpec = swaggerJsdoc(swaggerConfig);

@@ -27,6 +27,20 @@
       "roles": ["admin", "manager", "user"],
       "requiredTables": ["shiftroaster_config", "shiftroaster_schedules", "shiftroaster_shifts", "shiftroaster_employees", "shiftroaster_leaves"],
       "schemaVersion": "1.0.0"
+    },
+    {
+      "moduleId": "servicenow",
+      "name": "ServiceNow",
+      "description": "ServiceNow ITSM integration — incidents, RITMs, changes, SLA tracking, and compliance reporting",
+      "version": "1.0.0",
+      "isCore": false,
+      "enabled": false,
+      "initialized": false,
+      "order": 2,
+      "icon": "Headset",
+      "roles": ["admin", "manager", "user"],
+      "requiredTables": ["servicenow_incidents", "servicenow_ritms", "servicenow_changes", "servicenow_sla_config", "servicenow_business_hours", "servicenow_connection_config"],
+      "schemaVersion": "1.0.0"
     }
   ],
   "roles": {

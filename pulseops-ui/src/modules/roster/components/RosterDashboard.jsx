@@ -341,10 +341,23 @@ export default function RosterDashboard({ onNavigateToConfig }) {
     return shift?.label || 'Unknown';
   };
 
-  const getShiftTime = (shiftId) => {
-    const shift = shifts.find(s => s.id === shiftId);
-    return shift?.time || '—';
-  };
+const SCROLLBAR_CSS = `
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: linear-gradient(to bottom, #e0f2fe, #b3e5fc);
+    border-radius: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #4fc3f7, #29b6f6);
+    border-radius: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #29b6f6, #0277bd);
+  }
+`;
 
   const renderDailyGridView = () => {
     const dateKey = getSafeDateKey(currentDate);
@@ -378,9 +391,9 @@ export default function RosterDashboard({ onNavigateToConfig }) {
                       {emp.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-surface-800 truncate">{emp.name}</p>
-                      <p className="text-[10px] text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
-                      {emp.hoursWorked && <p className="text-[10px] font-semibold text-teal-600 mt-1">{emp.hoursWorked}h</p>}
+                      <p className="font-bold text-base text-surface-800 truncate">{emp.name}</p>
+                      <p className="text-xs text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
+                      {emp.hoursWorked && <p className="text-xs font-semibold text-teal-600 mt-1">{emp.hoursWorked}h</p>}
                     </div>
                   </div>
                 </div>
@@ -442,7 +455,7 @@ export default function RosterDashboard({ onNavigateToConfig }) {
           <div className={`${EMPLOYEE_COL_WIDTH} flex-shrink-0 bg-gradient-to-br from-brand-500 via-brand-600 to-teal-700 border-r-2 border-surface-300 p-4 flex items-end justify-start`}>
             <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">EMPLOYEE / ROLE</p>
           </div>
-          <div className="flex-1 overflow-x-auto custom-scrollbar">
+          <div className="flex-1">
             <div className="flex">
               {weekDays.map((day, idx) => {
                 const isWeekend = day.getDay() === 0 || day.getDay() === 6;
@@ -468,9 +481,9 @@ export default function RosterDashboard({ onNavigateToConfig }) {
                       {emp.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-surface-800 truncate">{emp.name}</p>
-                      <p className="text-[10px] text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
-                      {emp.hoursWorked && <p className="text-[10px] font-semibold text-teal-600 mt-1">{emp.hoursWorked}h</p>}
+                      <p className="font-bold text-base text-surface-800 truncate">{emp.name}</p>
+                      <p className="text-xs text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
+                      {emp.hoursWorked && <p className="text-xs font-semibold text-teal-600 mt-1">{emp.hoursWorked}h</p>}
                     </div>
                   </div>
                 </div>
@@ -495,15 +508,15 @@ export default function RosterDashboard({ onNavigateToConfig }) {
                             if (!isAssigned) return null;
                             return (
                               <div key={shift.id} onClick={() => openEditModal(dateKey, shift.id, workers)} className={`group cursor-pointer rounded-lg p-2 text-center transition-all hover:shadow-md hover:scale-105 relative overflow-hidden border-2 w-full ${getShiftColor(shift.id)} bg-opacity-30 border-opacity-50`}>
-                                <p className="text-[9px] font-extrabold uppercase tracking-wider leading-tight">{getShiftLabel(shift.id)}</p>
-                                <p className="text-[8px] font-semibold mt-0.5 opacity-75">{getShiftTime(shift.id)}</p>
+                                <p className="text-sm font-extrabold uppercase tracking-wider leading-tight">{getShiftLabel(shift.id)}</p>
+                                <p className="text-sm font-semibold mt-0.5 opacity-75">{getShiftTime(shift.id)}</p>
                                 <div className="absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 text-brand-600 transition-opacity"><Edit2 size={10} /></div>
                               </div>
                             );
                           })}
                           {shifts.filter(s => (daySchedule[s.id] || []).includes(emp.id)).length === 0 && (
                             <div className="rounded-lg p-2 text-center bg-surface-200/40 border-2 border-surface-300/40 w-full">
-                              <p className="text-[9px] font-semibold text-surface-500">OFF</p>
+                              <p className="text-xs font-semibold text-surface-500">OFF</p>
                             </div>
                           )}
                         </div>
@@ -536,7 +549,7 @@ export default function RosterDashboard({ onNavigateToConfig }) {
           <div className={`${EMPLOYEE_COL_WIDTH} flex-shrink-0 bg-gradient-to-br from-brand-500 via-brand-600 to-teal-700 border-r-2 border-surface-300 p-4 flex items-end justify-start`}>
             <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">EMPLOYEE / ROLE</p>
           </div>
-          <div className="flex-1 overflow-x-auto custom-scrollbar">
+          <div className="flex-1">
             <div className="flex">
               {monthDays.map((day) => {
                 const dateObj = new Date(year, month, day);
@@ -562,8 +575,8 @@ export default function RosterDashboard({ onNavigateToConfig }) {
                       {emp.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-xs text-surface-800 truncate">{emp.name}</p>
-                      <p className="text-[9px] text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
+                      <p className="font-bold text-sm text-surface-800 truncate">{emp.name}</p>
+                      <p className="text-xs text-surface-500 font-medium truncate">{emp.role || 'Staff'}</p>
                     </div>
                   </div>
                 </div>
@@ -588,14 +601,14 @@ export default function RosterDashboard({ onNavigateToConfig }) {
                             const isAssigned = workers.includes(emp.id);
                             if (!isAssigned) return null;
                             return (
-                              <div key={shift.id} onClick={() => openEditModal(dateKey, shift.id, workers)} className={`group cursor-pointer rounded p-1 text-center transition-all hover:shadow-md hover:scale-105 relative overflow-hidden border w-full text-[7px] ${getShiftColor(shift.id)} bg-opacity-30 border-opacity-50`}>
-                                <p className="font-extrabold uppercase leading-tight">{getShiftLabel(shift.id)}</p>
+                              <div key={shift.id} onClick={() => openEditModal(dateKey, shift.id, workers)} className={`group cursor-pointer rounded-lg p-2 text-center transition-all hover:shadow-lg hover:scale-110 relative overflow-hidden border-2 w-full shadow-sm ${getShiftColor(shift.id)} bg-opacity-40 border-opacity-60 hover:border-opacity-80`}>
+                                <p className="text-sm font-extrabold uppercase leading-tight">{getShiftLabel(shift.id)}</p>
                               </div>
                             );
                           })}
                           {shifts.filter(s => (daySchedule[s.id] || []).includes(emp.id)).length === 0 && (
-                            <div className="rounded p-1 text-center bg-surface-200/40 border border-surface-300/40 w-full">
-                              <p className="text-[7px] font-semibold text-surface-500">OFF</p>
+                            <div className="rounded-lg p-2 text-center bg-surface-200/40 border-2 border-surface-300/40 w-full shadow-sm">
+                              <p className="text-xs font-semibold text-surface-500">OFF</p>
                             </div>
                           )}
                         </div>
@@ -613,6 +626,7 @@ export default function RosterDashboard({ onNavigateToConfig }) {
 
   return (
     <div className="flex flex-col h-full min-h-0 space-y-5 animate-in fade-in duration-300">
+      <style dangerouslySetInnerHTML={{ __html: SCROLLBAR_CSS }} />
       {/* ─── Current Shift Header Bar ─────────────────────────────────── */}
       {cs?.currentShift && (
         <div className="shrink-0 bg-gradient-to-r from-brand-600 via-teal-600 to-brand-700 rounded-2xl p-4 text-white shadow-lg shadow-brand-600/20 flex flex-wrap items-center gap-6">
@@ -689,7 +703,7 @@ export default function RosterDashboard({ onNavigateToConfig }) {
             <button onClick={() => setViewMode('month')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${viewMode === 'month' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><Grid size={16} /> Monthly</button>
           </div>
           <div className="flex bg-surface-100 p-1 rounded-xl border border-surface-200/60 shadow-inner">
-            <button onClick={() => setLayoutMode('grid')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${layoutMode === 'grid' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><LayoutGrid size={16} /> Grid</button>
+            <button onClick={() => setLayoutMode('grid')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${layoutMode === 'grid' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><LayoutGrid size={16} /> Calendar view</button>
             <button onClick={() => setLayoutMode('table')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${layoutMode === 'table' ? 'bg-white shadow-sm text-brand-600 border border-surface-200/50' : 'text-surface-500 hover:text-surface-800'}`}><Table2 size={16} /> Table</button>
           </div>
           <div className="flex items-center bg-surface-50 border border-surface-200 rounded-xl p-1 shadow-sm">

@@ -156,19 +156,88 @@ export async function loadDemoData() {
 
 /**
  * Wipe all ShiftRoaster module data.
- * @returns {Promise<{success: boolean}>}
+ * Drops all module tables from the database using queryService.dropTable().
+ * @returns {Promise<{success: boolean, droppedTables: Array}>}
  */
 export async function wipeModuleData() {
+  const droppedTables = [];
+  let hasErrors = false;
+
   try {
-    await ShiftRoasterLeave.destroy({ where: {}, truncate: true, cascade: true });
-    await ShiftRoasterEmployee.destroy({ where: {}, truncate: true, cascade: true });
-    await ShiftRoasterShift.destroy({ where: {}, truncate: true, cascade: true });
-    await RosterSchedule.destroy({ where: {}, truncate: true, cascade: true });
-    await RosterConfig.destroy({ where: {}, truncate: true, cascade: true });
-    return { success: true };
+    const existingTables = await queryService.getTablesBySchema();
+    logger.info('wipeModuleData: Existing tables in schema', { existingTables, requiredTables: REQUIRED_TABLES });
+
+    // Drop tables one at a time, waiting for each to complete
+    for (const tableName of REQUIRED_TABLES) {
+      if (!existingTables.includes(tableName)) {
+        logger.warn(`Table not found in schema: ${tableName}`, { existingTables });
+        droppedTables.push({ name: tableName, status: 'not_found' });
+        continue;
+      }
+      try {
+        logger.info(`Attempting to drop table: ${tableName}`);
+        await queryService.dropTable(tableName);
+        logger.info(`Successfully dropped table: ${tableName}`);
+        
+        // Verify this specific table is gone before moving to next
+        const stillExists = await queryService.tableExists(tableName);
+        if (stillExists) {
+          logger.error(`Table still exists after DROP: ${tableName}`);
+          droppedTables.push({ name: tableName, status: 'failed', error: 'Table still exists after DROP' });
+          hasErrors = true;
+        } else {
+          droppedTables.push({ name: tableName, status: 'dropped' });
+        }
+      } catch (err) {
+        logger.error(`Failed to drop table ${tableName}`, { error: err.message, stack: err.stack });
+        droppedTables.push({ name: tableName, status: 'error', error: err.message });
+        hasErrors = true;
+      }
+    }
+
+    // Drop orphaned enum types created by Sequelize for this module
+    try {
+      const enums = await queryService.getEnumTypes();
+      const rosterEnums = enums.filter(e => e.startsWith('enum_shiftroaster'));
+      for (const typeName of rosterEnums) {
+        await queryService.dropEnumType(typeName);
+        logger.info(`Dropped enum type ${typeName}`);
+      }
+    } catch (_) {}
+
+    // Final verification - check all tables are gone
+    const remaining = await queryService.getTablesBySchema();
+    logger.info('wipeModuleData: Remaining tables after drop attempt', { remaining, droppedTables });
+    for (const entry of droppedTables) {
+      if (entry.status === 'dropped' && remaining.includes(entry.name)) {
+        logger.error(`Table still exists after DROP: ${entry.name}`, { remaining });
+        entry.status = 'failed';
+        entry.error = 'Table still exists after DROP — check database permissions';
+        hasErrors = true;
+      }
+    }
+
+    const droppedCount = droppedTables.filter(t => t.status === 'dropped').length;
+    const notFoundCount = droppedTables.filter(t => t.status === 'not_found').length;
+    
+    // If all tables were not found, this is not a successful operation
+    const success = droppedCount > 0 && !hasErrors;
+    
+    logger.info('ShiftRoaster hard reset completed', { droppedTables, droppedCount, notFoundCount, hasErrors, success });
+    return {
+      success,
+      droppedTables,
+      droppedCount,
+      notFoundCount,
+      message: droppedCount > 0 
+        ? `Dropped ${droppedCount} of ${REQUIRED_TABLES.length} tables`
+        : notFoundCount === REQUIRED_TABLES.length
+          ? 'No tables found - schema may not be initialized'
+          : 'Failed to drop tables',
+    };
   } catch (err) {
-    logger.error('Failed to wipe ShiftRoaster data', { error: err.message });
-    throw err;
+    logger.error('Failed to wipe ShiftRoaster data', { error: err.message, stack: err.stack });
+    return { success: false, droppedTables, droppedCount: 0, message: `Error during wipe: ${err.message}` };
   }
 }
 

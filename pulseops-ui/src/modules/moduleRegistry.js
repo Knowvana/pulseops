@@ -25,11 +25,13 @@
 // To register a new module, import its manifest and add it to MANIFESTS.
 import adminManifest from '@modules/admin/manifest.jsx';
 import rosterManifest from '@modules/roster/manifest.jsx';
+import servicenowManifest from '@modules/servicenow/manifest.jsx';
 
 // ─── Master manifest list ────────────────────────────────────────────────────
 const MANIFESTS = [
   adminManifest,
   rosterManifest,
+  servicenowManifest,
 ];
 
 /**
